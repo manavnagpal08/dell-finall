@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #059669;      /* Enterprise Green */
+  --color-brand-secondary: #10B981;    /* Emerald Green */
+  --color-brand-accent: #34D399;       /* Fresh Green */
+  --color-brand-success: #16A34A;      /* Success Green */
+  --color-brand-warning: #F59E0B;      /* Warning Amber */
+  --color-brand-error: #DC2626;        /* Danger Red */
+  --color-brand-dark: #0F172A;         /* Primary Slate Text */
+  --color-brand-gray-light: #F8FAFC;   /* Background Slate */
+  --color-brand-gray-med: #E2E8F0;     /* Border Slate */
+  --color-brand-text-muted: #94A3B8;   /* Muted Text */
+  
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  
+  --shadow-premium: 0 1px 3px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.01);
+  --shadow-premium-hover: 0 4px 12px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.02);
+  --shadow-premium-card: 0 12px 24px -4px rgba(0, 0, 0, 0.01), 0 4px 12px -2px rgba(0, 0, 0, 0.01);
+
+  --font-sans: 'Segoe UI', Inter, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --font-display: 'Segoe UI', Inter, system-ui, sans-serif;
+
+  --color-blue-50: #ECFDF5;
+  --color-blue-100: #D1FAE5;
+  --color-blue-200: #A7F3D0;
+  --color-blue-300: #6EE7B7;
+  --color-blue-400: #34D399;
+  --color-blue-500: #10B981;
+  --color-blue-600: #059669;
+  --color-blue-700: #047857;
+  --color-blue-800: #065F46;
+  --color-blue-900: #064E3B;
+  --color-blue-950: #022C22;
+}
+
+:root {
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+}
+
+html {
+  font-size: 15px; /* Scales up all relative Tailwind rem sizing */
+}
+
+body {
+  background-color: #F5F7FB;
+  color: #0F172A;
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Custom Scrollbar for premium tables and scroll areas */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
+}
+
+/* Animations for dialog and overlays */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes flow {
+  from { transform: translateX(-120px); }
+  to { transform: translateX(calc(100vw + 120px)); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes gridShift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 40px 40px, 40px 40px; }
+}
+
+@keyframes scanLine {
+  0% { transform: translateX(-110%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(110%); opacity: 0; }
+}
+
+@keyframes softLift {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.01); }
+}
+
+@keyframes routeDash {
+  from { stroke-dashoffset: 140; }
+  to { stroke-dashoffset: 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.surface-grid {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Override browser autofill background color */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    -webkit-text-fill-color: #0F172A !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+.animate-scan {
+  animation: scan 4s linear infinite;
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+@keyframes scan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(1500px); }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}

@@ -1,0 +1,412 @@
+HACKATHON PROBLEM STATEMENT 
+Agentic AI for Logistics Route Optimization 
+Geospatial Intelligence | Forward & Reverse Logistics | Cost Optimization | Inventory Resilience 
+ 
+Track 
+Agentic AI / 
+Geospatial / Logistics 
+Level 
+2nd Year B.E. / 
+B.Tech 
+Duration 
+24 Hours 
+Team Size 
+3–4 Members 
+ 
+Problem Overview 
+Every day, thousands of hardware parts travel across a global network of hubs, satellite 
+locations, and repair centers. When a part fails at a customer site, it needs to travel forward — 
+from a warehouse to the customer. When a part is broken and needs repair, it travels in reverse 
+— from the customer back through the network to a repair center, and once fixed, onward to be 
+redeployed. 
+This network is expensive and complex. Parts are often routed inefficiently — sent from a 
+distant hub when a closer satellite had stock, or allowed to sit at a congested hub when a faster 
+route was available. SLA commitments are missed, logistics costs balloon, and customers wait 
+longer than necessary. 
+Your challenge is to build an Agentic AI system, powered by geospatial analysis and historical 
+logistics data, that autonomously analyses routing patterns, identifies inefficiencies, optimizes 
+routing decisions, and produces visual and actionable insights — for both forward and reverse 
+logistics flows. 
+You are given a dataset of 1,800 real-world-scale logistics transactions across 12 hub locations, 
+8 repair centers, and 178 unique parts, with a total logistics cost pool of USD 65 million. Your 
+system must make sense of this data and help decision-makers cut costs, reduce delays, and 
+keep repair inventory healthy. 
+ 
+ 
+Understanding the Logistics Network 
+Forward Logistics: Getting Parts to Customers 
+When a customer's hardware fails and needs a replacement part, the following flow is triggered: 
+ 
+Step What Happens Optimization Opportunity 
+1. Check 
+Destination 
+Nearest Hub 
+Does the hub closest to the customer have 
+stock? 
+Use this hub — shortest route, lowest 
+cost 
+2. Check Satellite 
+Locations 
+If nearest hub has no stock, check surrounding 
+satellites 
+Route from satellite if faster than 
+distant primary hub 
+3. Check Next-
+Nearest Hub 
+If satellites are also stocked out, escalate to 
+next hub 
+Identify which hub to use and optimal 
+routing path 
+4. Source 
+Internationally 
+Last resort: source from an international hub Flag as high-cost; recommend 
+proactive stocking 
+5. Deliver to 
+Customer 
+Final leg: part dispatched to customer location Minimize last-mile cost and transit 
+time 
+ 
+Reverse Logistics: Collecting and Repairing Broken Parts 
+When a broken part is collected from a customer for repair, it flows in reverse: 
+ 
+Step What Happens Optimization Opportunity 
+1. Collection 
+from Customer 
+Field engineer collects defective part and 
+packs it 
+Minimize collection-to-hub transit time 
+2. Route to 
+Nearest Hub 
+Part is sent to the nearest regional hub Consolidate shipments; avoid single-
+part shipments 
+3. Hub to Repair 
+Center (TPR) 
+Hub routes part to the assigned third-party 
+repair center 
+Choose TPR with capacity; avoid 
+overloaded repair centers 
+4. Repair & 
+Quality Check 
+TPR repairs the part; quality verified Track repair SLA; flag overdue repairs 
+5. Redeployment Repaired part returned to inventory for future 
+forward dispatch 
+Route back to the hub with lowest stock 
+of this part type 
+ 
+The Core Optimization Problem 
+Right now, routing decisions are often made manually or based on simple rules (e.g., always use 
+the nearest hub). 
+Your AI agent must learn from 1,800 historical transactions — analysing cost, SLA performance, 
+hub utilisation, and transit times — to recommend smarter routing decisions. 
+The goal: reduce total logistics cost and SLA breach rates by at least 15–20% compared to the 
+current routing patterns visible in the dataset. 
+ 
+ 
+Your Dataset 
+You are provided with a single Excel workbook containing four sheets. All data is synthetic and 
+generated to reflect realistic logistics patterns. 
+ 
+Sheet Name Contents Key Fields 
+Logistics_Transactions 1,800 rows of historical shipment 
+records covering both forward and 
+reverse flows 
+Transaction ID, Flow Type, Part No, 
+Origin/Intermediate/Destination Hubs, 
+Quantity, Costs, Dates, SLA Breach, Stock 
+Levels, Tamper Flag, Status 
+Hub_Location_Master Details of all 12 hub and satellite 
+locations 
+Hub ID, City, Country, Latitude, Longitude, 
+Hub Type 
+(Primary/Regional/Satellite/International), 
+Inventory Capacity, Current Stock 
+TPR_Master Details of all 8 third-party repair 
+centers 
+TPR ID, City, Country, Latitude, Longitude, 
+Repair Capacity per Day, Current Workload, 
+SLA Days, Specialisation 
+Parts_Master Master catalogue of all 178 parts Part No, Description, Category, Unit Cost, 
+Weight, Lead Time, Min Stock Level, 
+Fragile, Hazardous flags 
+ 
+Dataset Specs 
+Total Transactions: 1,800 rows 
+Total Logistics Cost Pool: USD 65,000,000 
+Locations: 12 hubs (4 Primary, 4 Regional/Satellite, 4 International) + 8 TPR repair centers 
+across India, Singapore, Malaysia, UAE, Netherlands 
+Parts: 178 unique SKUs across 8 categories (Compute, Storage, Networking, Power, Display, 
+Cooling, Peripheral, Chassis) 
+Date Range: Full calendar year 2024 
+Flow Split: ~60% Forward Logistics, ~40% Reverse Logistics 
+Coordinates: All hubs and TPRs have real latitude/longitude values for geospatial mapping 
+ 
+ 
+Core Challenges to Solve 
+Challenge 1 — Geospatial Network Visualisation 
+Before optimising anything, you need to see the network. Build an interactive geospatial map 
+that visualises: 
+• All hub locations plotted on a map with type indicators (Primary / Regional / Satellite / 
+International) 
+• All TPR locations plotted with current workload and capacity indicators 
+• Active shipment routes as lines connecting origin → intermediate hub → destination 
+(colour-coded by flow type and health status) 
+• A heat-map or bubble chart showing where SLA breaches and tamper alerts are 
+concentrated geographically 
+• A choropleth or flow diagram showing total logistics cost by origin-destination corridor 
+ 
+Deliverable: An interactive map (use Folium, Plotly, Kepler.gl, Deck.gl, or any mapping library) 
+that a logistics manager can use to understand the network at a glance. 
+ 
+Challenge 2 — Route Efficiency Analysis 
+Analyse historical routing patterns to identify where inefficiencies exist: 
+• Identify the top 10 most expensive routing corridors (origin-hub to destination) and 
+explain why they are expensive 
+• Detect routes where parts were sourced from a distant hub even though a closer hub or 
+satellite had sufficient stock 
+• Calculate the average cost per unit per km for each corridor and identify outliers 
+• Identify which hubs are consistently over-utilised (high-cost routing bottlenecks) vs 
+under-utilised 
+• Compare actual transit days vs expected for each corridor and flag chronic 
+underperformers 
+ 
+Deliverable: A visual dashboard showing corridor efficiency rankings, cost-per-km analysis, and 
+hub utilisation heatmap. 
+ 
+Challenge 3 — Agentic Routing Recommender 
+Build an AI agent that, given a new part request, recommends the optimal routing path. The 
+agent must: 
+• Accept inputs: Part No, Quantity, Priority, Destination City 
+• Query the Hub Location Master and current stock levels to determine which hubs have 
+available stock 
+• Apply a routing decision tree: Nearest Hub with Stock → Nearest Satellite → Next Hub 
+→ International Source 
+• Calculate the estimated cost and transit time for each candidate route 
+• Recommend the best route with a justification (cost, distance, availability, SLA 
+confidence) 
+• Generate an alternative route as a backup if the primary route has risk (low stock, 
+overloaded hub) 
+• Learn from historical SLA breach patterns: if a route has a 40%+ breach history, warn 
+the user and downrank it 
+ 
+Deliverable: A working agent (demo via CLI, Streamlit, or Gradio) that accepts a routing request 
+and outputs a ranked recommendation with cost estimates and risk flags. 
+ 
+Challenge 4 — Cost Optimisation Model 
+Your agent should be able to answer: "How much could we save if we routed smarter?" 
+• Identify all transactions in the dataset where a suboptimal route was used (i.e., a 
+cheaper alternative was available) 
+• Calculate the excess cost of the suboptimal routing for each such transaction 
+• Aggregate potential savings by hub, by part category, by logistics partner, and by flow 
+type 
+• Model the impact of holding more inventory at satellite locations (reducing the need for 
+expensive inter-hub transfers) 
+• Produce a "What-If" analysis: if the top-3 most expensive corridors were re-routed 
+optimally, what is the total saving? 
+ 
+Deliverable: A cost optimisation report (visual + tabular) showing current vs optimised cost per 
+corridor, total potential savings, and inventory investment needed to unlock those savings. 
+ 
+Challenge 5 — Reverse Logistics Optimisation 
+Optimising the reverse flow (broken part collection → repair → redeployment) is equally 
+important: 
+• Analyse which repair centers (TPRs) are over-capacity and which are underutilised 
+• Identify broken parts that were routed to a distant TPR when a closer one with capacity 
+and specialisation match was available 
+• Calculate the cost of redeployment: once a part is repaired, is it being sent back to the 
+hub with the highest demand for that part? 
+• Detect repair consolidation opportunities: multiple small single-part shipments from the 
+same hub to the same TPR that could be batched 
+• Flag TPRs where current stock of repair inputs (spare components) is below minimum 
+threshold — generate a restock alert 
+ 
+Deliverable: A reverse logistics optimisation dashboard with TPR utilisation view, consolidation 
+opportunities, redeployment efficiency analysis, and restock alert list. 
+ 
+Challenge 6 — SLA Breach Predictor 
+Train a lightweight predictive model to predict whether a shipment will breach its SLA before it is 
+dispatched: 
+• Features to consider: origin hub, destination, part category, priority, quantity, logistics 
+partner, departure day of week, current hub utilisation, stock level at origin 
+• Target variable: SLA_Breach (YES / NO) from the Logistics_Transactions sheet 
+• Build a simple classifier (Decision Tree, Random Forest, or Logistic Regression — 
+accessible to 2nd year students) 
+• Evaluate performance: accuracy, precision, recall, confusion matrix 
+• Integrate the predictor into the routing recommender: if a recommended route has a 
+predicted SLA breach probability > 50%, flag it 
+ 
+Deliverable: A trained model with evaluation metrics and integration into the routing agent as a 
+risk signal. 
+ 
+ 
+Reference Architecture 
+Your solution should be structured as a set of cooperating agents, each handling a distinct 
+domain. Any cloud platform or framework is permitted. 
+ 
+Agent / Component Responsibility 
+Data Ingestion Agent Loads the Excel dataset; validates schema; normalises dates and numeric 
+fields; flags data quality issues 
+Geospatial Mapper Renders the network map; plots hubs, TPRs, and active routes; generates 
+heatmaps and corridor flow diagrams 
+Route Analyser Agent Analyses historical routes; calculates cost per km; identifies suboptimal 
+corridors; benchmarks hub utilisation 
+Routing Recommender 
+Agent 
+Accepts new shipment requests; applies decision tree logic; scores 
+candidate routes; outputs ranked recommendations with costs 
+Cost Optimisation Agent Quantifies excess cost from suboptimal routing; models inventory 
+investment trade-offs; generates What-If savings analysis 
+Reverse Logistics Agent Analyses reverse flow; TPR capacity and utilisation; consolidation 
+opportunities; redeployment routing; restock alerts 
+SLA Predictor Predicts SLA breach probability for a proposed route; integrates as a risk 
+flag into the routing recommender 
+Insight & Report Generator Produces all visualisations, dashboards, and narrative summaries; formats 
+outputs for logistics managers 
+Orchestrator / Planner Coordinates agent handoffs; manages context flow; ensures agents share 
+common data state 
+ 
+ 
+Mandatory Outputs 
+Your solution must produce the following outputs for evaluation: 
+ 
+Output Description 
+Network Map Interactive geospatial map of all hubs, TPRs, and active routes with cost and 
+status overlays 
+Corridor Efficiency Report Ranked list of top inefficient corridors with cost-per-km, breach rate, and 
+improvement potential 
+Routing Recommendation Live agent demo: input a part request, output an optimised route with cost, 
+ETA, and risk score 
+Cost Optimisation Report Current vs optimised cost comparison; total potential savings; What-If 
+analysis for top corridors 
+Reverse Logistics 
+Dashboard 
+TPR utilisation view; consolidation opportunities; redeployment efficiency; 
+restock alerts 
+SLA Breach Predictor Trained classifier with evaluation metrics; integrated risk flag in routing 
+recommendations 
+Executive Summary Slide One-slide portfolio view: network health, top cost insights, potential savings, 
+and top recommendations 
+ 
+ 
+Sample Insights to Discover 
+Here are the types of findings your agent should be able to surface from the dataset. These are 
+examples — your analysis may find others: 
+ 
+Insight Type Example Finding 
+Routing Inefficiency 23% of forward logistics shipments were sourced from an international hub even 
+though a domestic satellite had stock — average excess cost: USD 4,200 per 
+shipment 
+Hub Bottleneck Mumbai Hub processed 34% of all reverse logistics transactions but only has 
+18% of total network capacity — contributing to a 41% SLA breach rate on that 
+corridor 
+Consolidation 
+Opportunity 
+84 separate single-unit shipments from Bangalore Hub to TPR-BLR-01 over Q2 
+could have been batched into 12 consolidated shipments — estimated saving: 
+USD 180,000 
+SLA Pattern Shipments dispatched on Fridays have a 2.3x higher breach rate than midweek 
+dispatches — a logistics partner scheduling pattern 
+Redeployment Gap Repaired Compute parts from TPR-CHE-01 are being sent back to Chennai 
+Hub, which already has excess stock — while Kolkata Satellite is critically 
+understocked for the same part type 
+Cost Corridor The Delhi → Singapore corridor has the highest per-unit logistics cost in the 
+dataset (avg USD 340/unit) but accounts for only P3/P4 priority shipments — a 
+clear candidate for sea freight re-routing 
+ 
+ 
+Suggested Participant Workflow 
+1. Load the Excel dataset and explore all four sheets; validate data types, check for nulls, 
+and compute basic summary statistics. 
+2. Build the geospatial map with all hub and TPR locations plotted; add at least 20 sample 
+shipment routes as lines. 
+3. Run corridor efficiency analysis: compute cost per km, average transit days, and SLA 
+breach rate for each origin-destination pair. 
+4. Build the routing recommender agent: implement the 4-step decision tree and 
+demonstrate it with 3 live routing queries. 
+5. Run cost optimisation analysis: identify the top 5 suboptimal corridors and quantify total 
+potential savings. 
+6. Analyse the reverse logistics flow: identify consolidation opportunities and TPR utilisation 
+imbalances. 
+7. Train the SLA breach predictor and integrate it as a risk flag into the routing agent. 
+8. Produce the executive summary slide and all mandatory outputs; prepare a 5-minute live 
+demo. 
+ 
+ 
+Suggested Technology Stack 
+Teams are free to use any tools, frameworks, or cloud platforms. Here are suggestions: 
+ 
+Domain Suggested Options 
+Data Processing Python with pandas, numpy; Jupyter notebooks; Google Colab for free 
+GPU/compute 
+Geospatial Mapping Folium (easiest for beginners), Plotly Express, Kepler.gl, Deck.gl, or Leaflet.js 
+Geospatial Analysis GeoPandas, Shapely, OSMnx for distance calculations; Haversine formula for 
+simple lat/lon distance 
+Agent Framework LangChain, LangGraph, CrewAI, or custom Python orchestration with LLM 
+APIs 
+LLM for Reasoning OpenAI GPT-4o, Anthropic Claude, or Google Gemini to generate natural-
+language routing rationales 
+ML / Prediction scikit-learn for SLA predictor (RandomForest, LogisticRegression); XGBoost 
+for stronger performance 
+Visualisation Matplotlib, Seaborn, Plotly for charts; Streamlit or Gradio for interactive demo 
+UI 
+Cloud Platform Any cloud — AWS, Azure, GCP; or fully local; Streamlit Cloud for free hosting 
+of demos 
+Routing/Distance Google Maps Distance Matrix API, OpenRouteService (free), or simple 
+Haversine-based distance 
+ 
+ 
+Bonus Challenges (Optional) 
+• Dynamic Re-routing: If a hub goes offline mid-transit (simulate by removing a hub from 
+the active list), automatically re-route all affected in-flight shipments 
+• Carbon Footprint Calculator: Estimate CO2 emissions per shipment based on distance 
+and transport mode; include a carbon-optimised routing option 
+• Inventory Balancing Agent: Continuously rebalance stock across hubs using historical 
+demand forecasts to pre-position parts before requests arrive 
+• Natural Language Query Interface: Let users ask questions in plain English — e.g., 
+"Which hub has the most SLA breaches for Storage parts?" — and get a visual answer 
+• Live Route Tracker Simulation: Simulate a shipment moving in real time across the map, 
+with status updates at each hub scan point 
+• Multi-objective Optimisation: Allow the user to trade off cost vs. speed vs. carbon — and 
+show the Pareto frontier of optimal solutions 
+ 
+ 
+Judging Rubric (Mentor-Scored) 
+Mentors will assess submissions based on the following 13 dimensions. Winners will be 
+selected solely based on mentor rankings. 
+ 
+# Criterion What Mentors Look For 
+1 Solution Quality Effectiveness and completeness of the proposed solution 
+2 Tool Stack Used Appropriateness and sophistication of technologies applied 
+3 Presentation & Pitch Clarity, engagement, and delivery of the final presentation 
+4 Feasibility & Integration Practicality and ease of integration into real-world scenarios 
+5 Innovation & Originality Novelty of the idea and creative problem-solving 
+6 Modularity & Reusability Scalability and adaptability of the solution components 
+7 Impact Potential Anticipated value and influence of the solution 
+8 Testing & Validation Evidence of robustness and reliability through testing 
+9 User Experience & Design Intuitiveness, accessibility, and visual appeal 
+10 Documentation Clarity Quality and completeness of supporting documentation 
+11 Security & Privacy Consideration of data protection and secure practices 
+12 Explainability & Transparency Clarity in how the solution works and makes decisions 
+13 Feedback Loop / Learning 
+Capability 
+Ability to adapt, learn, or improve over time 
+ 
+🏅  Note on Winner Selection 
+Winners will be selected solely based on mentor rankings across all 13 dimensions above. 
+There is no audience vote or self-scoring. Mentor decisions are final. 
+ 
+ 
+Security & Privacy Considerations 
+Even at prototype level, keep these principles in mind: 
+• Treat location coordinates and shipment volumes as sensitive operational data — do not 
+expose them in public URLs or logs 
+• Parameterise all thresholds (SLA days, cost limits, stock minimums) — never hard-code 
+business rules 
+• Maintain an audit trail of every recommendation your agent makes, with the data and 
+rules used as evidence 
+• If integrating with external APIs (mapping, LLMs), ensure API keys are stored in 
+environment variables, never in source code 
+ 
+ 
+USD 65 million in logistics cost. 1,800 shipments. 12 hubs. Your agent's job: make every 
+route count. 
+Questions? Reach out to your hackathon coordinators. 

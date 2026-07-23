@@ -1,0 +1,31 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+
+# Node dependencies and build files
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Environment files
+.env
+.env.local
+.env.*
+backend/.env
+frontend/.env.local
+
+# Logs
+*.log
+frontend/dev-server.log
+
+# Local generated data and model artifacts
+*.db
+backend/ml/models_storage/*.joblib
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
