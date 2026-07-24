@@ -79,8 +79,10 @@ class DemandPositioningService:
 
             # Only generate cards for significant impact patterns (e.g. > 5 orders or > $1000 waste)
             if frequency >= 3 or waste_cost >= 1000:
-                opp_id = f"DP-OPP-{uuid.uuid4().hex[:6].upper()}"
-                rec_id = f"DP-REC-{uuid.uuid4().hex[:6].upper()}"
+                import hashlib
+                h = hashlib.md5(f"{part_no}-{dest}".encode()).hexdigest()[:6].upper()
+                opp_id = f"DP-OPP-{h}"
+                rec_id = f"DP-REC-{h}"
                 
                 # Use Gemini LLM to generate professional titles and summaries from raw SQL data
                 llm_prompt = f"""
@@ -149,11 +151,23 @@ Output JSON format strictly:
             )
         ]
 
+        import json
+        import os
+        approved_path = os.path.join("backend", "database", "approved_demand_positioning.json")
+        approved_ids = []
+        if os.path.exists(approved_path):
+            try:
+                with open(approved_path, "r") as f:
+                    approved_ids = json.load(f)
+            except Exception:
+                pass
+
         return DemandPositioningData(
             metrics=metrics,
             opportunities=opportunities,
             recommendations=recommendations,
-            waste_cost_by_city=waste_cost_by_city
+            waste_cost_by_city=waste_cost_by_city,
+            approved_opportunity_ids=approved_ids
         )
 
 demand_positioning_engine = DemandPositioningService()

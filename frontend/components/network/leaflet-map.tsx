@@ -58,10 +58,36 @@ const createArc = (start: [number, number], end: [number, number], bend = 0.2): 
 }
 
 const getTransportMode = (sourceId: string, targetId: string) => {
+  const s = sourceId.toUpperCase();
+  const t = targetId.toUpperCase();
+  
+  // Custom mapping for air corridors to ensure airplanes show up
+  const airCorridors = [
+    "LHR->DXB", "DXB->LHR", "LHR->MUM", "MUM->LHR", "LHR->DEL", "DEL->LHR", "LHR->SIN", "SIN->LHR",
+    "AMS->DXB", "DXB->AMS", "AMS->MUM", "MUM->AMS", "AMS->DEL", "DEL->AMS", "AMS->SIN", "SIN->AMS",
+    "DXB->SIN", "SIN->DXB", "DXB->MUM", "MUM->DXB", "DXB->DEL", "DEL->DXB",
+    "MUM->SIN", "SIN->MUM", "DEL->SIN", "SIN->DEL", "MUM->SYD", "SYD->MUM",
+    "SHA->LHR", "LHR->SHA", "SHA->AMS", "AMS->SHA", "SHA->DXB", "DXB->SHA",
+    "SHA->SIN", "SIN->SHA", "SHA->SYD", "SYD->SHA", "SHA->MUM", "MUM->SHA"
+  ];
+  if (airCorridors.includes(`${s}->${t}`)) {
+    return "air";
+  }
+
+  // Sea corridors (longer ocean transit)
+  const seaCorridors = [
+    "ROTTERDAM->MUM", "MUM->ROTTERDAM", "ROTTERDAM->SIN", "SIN->ROTTERDAM",
+    "ROTTERDAM->DXB", "DXB->ROTTERDAM", "ROTTERDAM->SHA", "SHA->ROTTERDAM",
+    "RTM->MUM", "MUM->RTM", "RTM->SIN", "SIN->RTM"
+  ];
+  if (seaCorridors.includes(`${s}->${t}`)) {
+    return "sea";
+  }
+
   const h = stableHash(`${sourceId}->${targetId}`) % 100;
-  if (h < 25) return "air";
-  if (h < 40) return "sea";
-  if (h < 60) return "rail";
+  if (h < 30) return "air";
+  if (h < 50) return "sea";
+  if (h < 70) return "rail";
   return "road";
 }
 
@@ -91,11 +117,19 @@ export default function LeafletMap({
   const simulationLayer = useRef<L.LayerGroup | null>(null)
   const riskLayer = useRef<L.LayerGroup | null>(null)
   const [isPlaying, setIsPlaying] = useState(true)
+  const [zoomLevel, setZoomLevel] = useState(3)
 
   const { data: riskEvents } = useGetRiskOverlay()
 
-  // Filter nodes/links based on layerState
+  // Filter nodes/links based on layerState and zoom level to prevent clutter
   const visibleNodes = nodes.filter(n => {
+    // Hide smaller nodes when zoomed out (zoomLevel < 5) to make map less bulky
+    if (zoomLevel < 5) {
+      if (n.type !== "Primary Hub" && n.type !== "International Hub") {
+        return false
+      }
+    }
+
     if (!layerState) return true
 
     // Flat format fallback
@@ -118,6 +152,19 @@ export default function LeafletMap({
   })
 
   const visibleLinks = links.filter(l => {
+    // Hide links connected to hidden minor hubs when zoomed out
+    if (zoomLevel < 5) {
+      const source = nodes.find(n => n.id === l.source_id)
+      const target = nodes.find(n => n.id === l.target_id)
+      if (!source || !target) return false
+      if (
+        (source.type !== "Primary Hub" && source.type !== "International Hub") ||
+        (target.type !== "Primary Hub" && target.type !== "International Hub")
+      ) {
+        return false
+      }
+    }
+
     if (!layerState) return true
 
     // Flat format fallback
@@ -161,9 +208,10 @@ export default function LeafletMap({
     if (!mapRef.current) return
 
     if (!mapInstance.current) {
+      const initialZoom = 3;
       mapInstance.current = L.map(mapRef.current, {
         center: [22, 65],
-        zoom: 3,
+        zoom: initialZoom,
         minZoom: 2,
         maxZoom: 10,
         zoomControl: false
@@ -182,6 +230,13 @@ export default function LeafletMap({
       markersLayer.current = L.layerGroup().addTo(mapInstance.current)
       simulationLayer.current = L.layerGroup().addTo(mapInstance.current)
       riskLayer.current = L.layerGroup().addTo(mapInstance.current)
+
+      // Listen for zoom events to dynamically show/hide detail layers
+      mapInstance.current.on("zoomend", () => {
+        if (mapInstance.current) {
+          setZoomLevel(mapInstance.current.getZoom())
+        }
+      })
     }
 
     const map = mapInstance.current
@@ -395,13 +450,13 @@ export default function LeafletMap({
       if (node.type === "Repair Center") strokeColor = "#2563EB" // Blue for repair
       else if (node.type === "International Hub") strokeColor = "#111827" // Dark for International
 
-      let sizeClass = "h-8 w-8"
+      let sizeClass = "h-6 w-6"
       let pulseHtml = ""
 
       if (isSelected) {
-        pulseHtml = `<div class="absolute h-12 w-12 rounded-full bg-[#00C853] opacity-20 animate-ping"></div>`
+        pulseHtml = `<div class="absolute h-9 w-9 rounded-full bg-[#00C853] opacity-20 animate-ping"></div>`
       } else if (isOverloaded) {
-        pulseHtml = `<div class="absolute h-10 w-10 rounded-full bg-red-500 opacity-20 animate-pulse"></div>`
+        pulseHtml = `<div class="absolute h-8 w-8 rounded-full bg-red-500 opacity-20 animate-pulse"></div>`
         strokeColor = "#EF4444"
       }
       
@@ -419,7 +474,7 @@ export default function LeafletMap({
       const html = `<div class="relative flex items-center justify-center ${sizeClass}">
         ${pulseHtml}
         ${aiIconHtml}
-        <div class="relative z-10 flex items-center justify-center h-8 w-8 rounded-full border-2 border-white shadow-md transition-transform duration-200 hover:scale-110 ${bgClass}" style="box-shadow: 0 4px 14px rgba(0,0,0,0.1); outline: 2px solid ${strokeColor}; outline-offset: -2px;">
+        <div class="relative z-10 flex items-center justify-center h-6 w-6 rounded-full border-2 border-white shadow-md transition-transform duration-200 hover:scale-110 ${bgClass}" style="box-shadow: 0 4px 14px rgba(0,0,0,0.1); outline: 2px solid ${strokeColor}; outline-offset: -2px;">
           ${svgIcon}
         </div>
       </div>`
@@ -427,8 +482,8 @@ export default function LeafletMap({
       const customIcon = L.divIcon({
         className: "custom-leaflet-marker",
         html,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       })
 
       const marker = L.marker([node.latitude, node.longitude], { icon: customIcon })
@@ -523,21 +578,21 @@ export default function LeafletMap({
         let marker = markersMap.get(s.id)
         if (!marker) {
           let svgIcon = '';
-          if (s.mode === 'road') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`;
-          else if (s.mode === 'air') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><path d="M17.8 19.2 16 11l-3.5-3.5C11.3 6.3 9.7 6.1 8 7.5L5 9l4.5 4.5L6 18l-3-1 1-4-2-2 3-3 2 2 3-3L15 4c2.8-2.8 7.2-.8 8 3l-1.8 10-3.4 2.2z"/></svg>`;
-          else if (s.mode === 'sea') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><path d="M2 12h20l-2 8H4Z"/><path d="M6 12V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/></svg>`;
-          else if (s.mode === 'rail') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11h16"/><line x1="12" y1="3" x2="12" y2="19"/><path d="M8 19l-2 3"/><path d="M16 19l2 3"/></svg>`;
+          if (s.mode === 'road') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`;
+          else if (s.mode === 'air') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><path d="M17.8 19.2 16 11l-3.5-3.5C11.3 6.3 9.7 6.1 8 7.5L5 9l4.5 4.5L6 18l-3-1 1-4-2-2 3-3 2 2 3-3L15 4c2.8-2.8 7.2-.8 8 3l-1.8 10-3.4 2.2z"/></svg>`;
+          else if (s.mode === 'sea') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><path d="M2 12h20l-2 8H4Z"/><path d="M6 12V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/></svg>`;
+          else if (s.mode === 'rail') svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11h16"/><line x1="12" y1="3" x2="12" y2="19"/><path d="M8 19l-2 3"/><path d="M16 19l2 3"/></svg>`;
 
           const iconHtml = `
-            <div class="relative flex items-center justify-center transition-all duration-300 transform scale-110 shadow-sm" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">
+            <div class="relative flex items-center justify-center transition-all duration-300 transform scale-110 shadow-sm" style="filter: drop-shadow(0 2.5px 5px rgba(0,0,0,0.25)); width: 16px; height: 16px;">
               ${svgIcon}
             </div>
           `
           const customIcon = L.divIcon({
             className: "shipment-marker",
             html: iconHtml,
-            iconSize: [8, 8],
-            iconAnchor: [4, 4]
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
           })
           marker = L.marker([lat, lng], { icon: customIcon, interactive: false })
           marker.addTo(simLayer)
@@ -550,6 +605,16 @@ export default function LeafletMap({
 
     return () => clearInterval(tick)
   }, [visibleLinks, isPlaying, layerState])
+
+  // Cleanup map container on unmount to prevent duplicate initialization errors
+  useEffect(() => {
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove()
+        mapInstance.current = null
+      }
+    }
+  }, [])
 
   // Risk Overlay Rendering
   useEffect(() => {

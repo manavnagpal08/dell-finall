@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.api.deps import get_db
 from backend.optimization.schemas.optimization import (
@@ -223,3 +224,32 @@ def get_demand_positioning(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to evaluate demand positioning opportunities: {str(e)}"
         )
+
+class DemandApprovePayload(BaseModel):
+    opportunity_id: str
+
+@router.post("/demand-positioning/approve", response_model=dict)
+def approve_demand_positioning_opp(
+    payload: DemandApprovePayload
+):
+    import json
+    import os
+    os.makedirs(os.path.join("backend", "database"), exist_ok=True)
+    approved_path = os.path.join("backend", "database", "approved_demand_positioning.json")
+    approved_ids = []
+    if os.path.exists(approved_path):
+        try:
+            with open(approved_path, "r") as f:
+                approved_ids = json.load(f)
+        except Exception:
+            pass
+    
+    if payload.opportunity_id not in approved_ids:
+        approved_ids.append(payload.opportunity_id)
+        try:
+            with open(approved_path, "w") as f:
+                json.dump(approved_ids, f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to persist approval: {str(e)}")
+            
+    return {"success": True, "approved_opportunity_ids": approved_ids}

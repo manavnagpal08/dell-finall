@@ -361,6 +361,7 @@ export interface DemandPositioningData {
   opportunities: OpportunityCard[];
   recommendations: ExecutiveRecommendation[];
   waste_cost_by_city: Record<string, number>;
+  approved_opportunity_ids?: string[];
 }
 
 // Predictive intelligence types

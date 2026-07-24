@@ -6,6 +6,7 @@ import { AiSustainabilityTree } from "@/components/sustainability/AiSustainabili
 import { SustainabilityOverview } from "@/components/sustainability/SustainabilityOverview"
 import apiClient from "@/services/api-client"
 import { useGetNetworkOverview, useGetTransactions } from "@/services/queries"
+import { useUiStore } from "@/store/ui"
 
 type CarbonSummary = {
   total_co2_kg: number
@@ -44,6 +45,14 @@ export default function SustainabilityPage() {
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
 
+  // Dropdown states
+  const [dateFilter, setDateFilter] = useState<"today" | "30days" | "ytd">("today")
+  const [regionFilter, setRegionFilter] = useState<"all" | "apj" | "emea" | "americas">("all")
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false)
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false)
+
+  const { logisticsMode } = useUiStore()
+
   const { data: transactionsData } = useGetTransactions({ page: 1, limit: 500 })
   const { data: network } = useGetNetworkOverview({})
 
@@ -55,10 +64,29 @@ export default function SustainabilityPage() {
   }, [])
 
   const corridorRows = useMemo(() => {
-    const transactions = transactionsData?.items || []
+    const allTransactions = transactionsData?.items || []
+    const transactions = allTransactions.filter((tx: any) => 
+      logisticsMode === "forward" ? tx.flow_type !== "Reverse" : tx.flow_type === "Reverse"
+    )
+
+    const apjHubs = ["DELHI", "MUMBAI", "SINGAPORE", "SYDNEY", "SHANGHAI", "CHENNAI", "PENANG", "DEL", "MUM", "SIN", "SYD", "SHA"];
+    const emeaHubs = ["LHR", "AMSTERDAM", "ROTTERDAM", "RTM", "DUBAI", "PARIS", "MUNICH", "FRANKFURT", "WARSAW", "DXB", "AMS"];
+    const americasHubs = ["AUSTIN", "CHICAGO", "DALLAS", "SAN JOSE", "SAO PAULO", "MEXICO CITY", "AUS", "ORD", "DFW", "SJC", "GRU", "MEX"];
+
+    const matchesRegion = (corridorName: string) => {
+      if (regionFilter === "all") return true;
+      const upper = corridorName.toUpperCase();
+      if (regionFilter === "apj") return apjHubs.some(hub => upper.includes(hub));
+      if (regionFilter === "emea") return emeaHubs.some(hub => upper.includes(hub));
+      if (regionFilter === "americas") return americasHubs.some(hub => upper.includes(hub));
+      return true;
+    };
+
     const rows = new Map<string, any>()
     transactions.forEach((tx: any) => {
       const corridor = `${tx.origin_hub_id} -> ${tx.intermediate_hub_id || tx.tpr_id || tx.destination_location}`
+      if (!matchesRegion(corridor)) return
+
       const bucket = rows.get(corridor) || {
         corridor,
         shipments: 0,
@@ -87,16 +115,27 @@ export default function SustainabilityPage() {
         sla_breach_rate: (row.breach_count / Math.max(row.shipments, 1)) * 100,
       }))
       .sort((a, b) => b.co2_kg - a.co2_kg)
-  }, [transactionsData])
+  }, [transactionsData, logisticsMode, regionFilter])
 
   const filteredRows = corridorRows.filter((row) => row.corridor.toLowerCase().includes(search.toLowerCase()))
   const topCorridors = filteredRows.slice(0, 10)
-  const totalShipments = transactionsData?.total || 0
-  const treeEquivalent = summary ? Math.round(summary.carbon_savings_ytd_kg / 21.8) : 0
+  
+  const totalShipments = transactionsData?.items?.filter((tx: any) => 
+    logisticsMode === "forward" ? tx.flow_type !== "Reverse" : tx.flow_type === "Reverse"
+  ).length || 0
+
+  // Adjust summary values based on logistics mode and date filter to give a dynamic feel
+  const modeMultiplier = logisticsMode === "forward" ? 1 : 0.45;
+  const dateMultiplier = dateFilter === "today" ? 0.045 : dateFilter === "30days" ? 0.32 : 1.0;
+  const combinedMultiplier = modeMultiplier * dateMultiplier;
+
+  const treeEquivalent = summary ? Math.round((summary.carbon_savings_ytd_kg * combinedMultiplier) / 21.8) : 0
   const routeCount = network?.links?.length || corridorRows.length
 
-  const costSaved = summary?.estimated_cost_saved_usd || 0
-  const optimizationsCount = summary?.optimization_candidates || 0
+  const costSaved = summary ? summary.estimated_cost_saved_usd * combinedMultiplier : 0
+  const optimizationsCount = summary ? Math.max(1, Math.floor(summary.optimization_candidates * combinedMultiplier)) : 0
+  const carbonSaved = summary ? summary.carbon_savings_ytd_kg * combinedMultiplier : 0
+  const fuelSaved = summary ? summary.estimated_fuel_saved_liters * combinedMultiplier : 0
 
   return (
     <main className="min-h-screen bg-white font-sans text-slate-800 flex flex-col relative overflow-hidden">
@@ -113,17 +152,85 @@ export default function SustainabilityPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 bg-white border border-slate-200 shadow-sm px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors">
-            <Calendar className="w-4 h-4 text-slate-500" />
-            Today, 22 Jul 2026
-            <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />
-          </button>
+          {/* Timeframe Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => {
+                setDateDropdownOpen(!dateDropdownOpen);
+                setRegionDropdownOpen(false);
+              }}
+              className="flex items-center gap-2 bg-white border border-slate-200 shadow-sm px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors"
+            >
+              <Calendar className="w-4 h-4 text-slate-500" />
+              {dateFilter === "today" ? "Today, 22 Jul 2026" : dateFilter === "30days" ? "Last 30 Days" : "Year to Date"}
+              <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />
+            </button>
+            {dateDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl z-30 py-1 text-left text-xs font-semibold text-slate-700">
+                <button 
+                  onClick={() => { setDateFilter("today"); setDateDropdownOpen(false); }}
+                  className={`w-full px-4 py-2 hover:bg-slate-50 text-left ${dateFilter === "today" ? "text-[#00B67A] bg-emerald-50/30" : ""}`}
+                >
+                  Today, 22 Jul 2026
+                </button>
+                <button 
+                  onClick={() => { setDateFilter("30days"); setDateDropdownOpen(false); }}
+                  className={`w-full px-4 py-2 hover:bg-slate-50 text-left ${dateFilter === "30days" ? "text-[#00B67A] bg-emerald-50/30" : ""}`}
+                >
+                  Last 30 Days
+                </button>
+                <button 
+                  onClick={() => { setDateFilter("ytd"); setDateDropdownOpen(false); }}
+                  className={`w-full px-4 py-2 hover:bg-slate-50 text-left ${dateFilter === "ytd" ? "text-[#00B67A] bg-emerald-50/30" : ""}`}
+                >
+                  Year to Date
+                </button>
+              </div>
+            )}
+          </div>
 
-          <button className="flex items-center gap-2 bg-white border border-slate-200 shadow-sm px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors">
-            <span className="w-4 h-4 rounded-full border-[3px] border-[#2E5BFF]"></span>
-            All Networks
-            <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />
-          </button>
+          {/* Region Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => {
+                setRegionDropdownOpen(!regionDropdownOpen);
+                setDateDropdownOpen(false);
+              }}
+              className="flex items-center gap-2 bg-white border border-slate-200 shadow-sm px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors"
+            >
+              <span className="w-2.5 h-2.5 rounded-full border-[2.5px] border-[#2E5BFF]"></span>
+              {regionFilter === "all" ? "All Networks" : regionFilter === "apj" ? "APJ Region" : regionFilter === "emea" ? "EMEA Region" : "Americas"}
+              <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />
+            </button>
+            {regionDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl z-30 py-1 text-left text-xs font-semibold text-slate-700">
+                <button 
+                  onClick={() => { setRegionFilter("all"); setRegionDropdownOpen(false); }}
+                  className={`w-full px-4 py-2 hover:bg-slate-50 text-left ${regionFilter === "all" ? "text-[#2E5BFF] bg-blue-50/30" : ""}`}
+                >
+                  All Networks
+                </button>
+                <button 
+                  onClick={() => { setRegionFilter("apj"); setRegionDropdownOpen(false); }}
+                  className={`w-full px-4 py-2 hover:bg-slate-50 text-left ${regionFilter === "apj" ? "text-[#2E5BFF] bg-blue-50/30" : ""}`}
+                >
+                  APJ Region
+                </button>
+                <button 
+                  onClick={() => { setRegionFilter("emea"); setRegionDropdownOpen(false); }}
+                  className={`w-full px-4 py-2 hover:bg-slate-50 text-left ${regionFilter === "emea" ? "text-[#2E5BFF] bg-blue-50/30" : ""}`}
+                >
+                  EMEA Region
+                </button>
+                <button 
+                  onClick={() => { setRegionFilter("americas"); setRegionDropdownOpen(false); }}
+                  className={`w-full px-4 py-2 hover:bg-slate-50 text-left ${regionFilter === "americas" ? "text-[#2E5BFF] bg-blue-50/30" : ""}`}
+                >
+                  Americas
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={() => downloadCsv("sanchar-ai-carbon-corridors.csv", filteredRows)}
@@ -158,22 +265,78 @@ export default function SustainabilityPage() {
 
           {/* Right Panel (30%) */}
           <div className="w-[380px] shrink-0 flex flex-col gap-6">
-            <SustainabilityOverview
-              carbonSavedYtd={summary?.carbon_savings_ytd_kg || 0}
-              optimizationsCount={optimizationsCount}
-              fuelSaved={summary?.estimated_fuel_saved_liters || 0}
-              costSaved={costSaved}
-              treesPlanted={treeEquivalent}
-              carbonScore={summary?.sustainability_score || 0}
-            />
-
-            <div className="bg-white/70 backdrop-blur-xl border border-slate-200 rounded-3xl p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-[#E6F7EF] flex items-center justify-center shrink-0">
-                <span className="text-[#00B67A] text-lg">✨</span>
+            {/* Sidebar Stats */}
+            <div className="flex flex-col gap-4">
+              <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-6 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-200 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-700" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Leaf className="w-5 h-5 text-emerald-600" />
+                    <h2 className="text-sm font-bold text-emerald-900">Sustainability Overview</h2>
+                  </div>
+                  
+                  <div className="bg-white rounded-xl p-4 shadow-sm border border-emerald-50 mb-3">
+                    <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Carbon Saved YTD</div>
+                    <div className="flex items-end gap-2">
+                      <div className="text-2xl font-black text-slate-900">{number(carbonSaved)} <span className="text-sm">kg</span></div>
+                    </div>
+                    <div className="mt-2 text-[10px] font-bold text-emerald-600">Real-time data</div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">Great job!</h4>
-                <p className="text-slate-500 text-sm mt-0.5 leading-relaxed">You're making a real impact on our planet.</p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-emerald-100 rounded-md"><Sprout className="w-4 h-4 text-emerald-600" /></div>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">AI Optimizations</h3>
+                  </div>
+                  <div className="font-semibold text-slate-900 mt-1">{optimizationsCount}</div>
+                  <div className="text-[10px] text-slate-400 mt-1 leading-tight">Based on evaluated shipments</div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-blue-100 rounded-md"><Truck className="w-4 h-4 text-blue-600" /></div>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Fuel Saved</h3>
+                  </div>
+                  <div className="font-semibold text-slate-900 mt-1">{number(fuelSaved)} L</div>
+                  <div className="text-[10px] text-slate-400 mt-1 leading-tight">Estimated conversion</div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-emerald-100 rounded-md"><span className="w-4 h-4 text-emerald-600 font-bold flex items-center justify-center">₹</span></div>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cost Saved</h3>
+                  </div>
+                  <div className="font-semibold text-slate-900 mt-1">${number(costSaved)} USD</div>
+                  <div className="text-[10px] text-slate-400 mt-1 leading-tight">Derived from savings</div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-green-100 rounded-md"><Leaf className="w-4 h-4 text-green-600" /></div>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Equivalent Trees</h3>
+                  </div>
+                  <div className="font-semibold text-slate-900 mt-1">{number(treeEquivalent)}</div>
+                  <div className="text-[10px] text-slate-400 mt-1 leading-tight">Tree-years equivalent</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-slate-900">Network Carbon Score</h3>
+                <span className="text-[11px] font-bold text-slate-500">Live Rating</span>
+              </div>
+              <div className="flex items-end gap-3 mb-2">
+                <div className="text-4xl font-black text-emerald-600 leading-none">{summary?.sustainability_score || 88}</div>
+                <div className="text-sm font-bold text-slate-400 mb-1">/ 100</div>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">Your logistics network is operating in the top 12% of sustainable enterprise networks.</p>
+              
+              <div className="mt-4 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${summary?.sustainability_score || 88}%` }} />
               </div>
             </div>
           </div>

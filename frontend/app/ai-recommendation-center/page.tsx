@@ -64,8 +64,8 @@ function CircularProgress({ value, color, size = 40, stroke = 4 }: any) {
   const offset = ((100 - value) / 100) * c
   
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90" width={size} height={size}>
+    <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg className="transform -rotate-90 shrink-0" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size/2} cy={size/2} r={r} stroke={C.gray100} strokeWidth={stroke} fill="transparent" />
         <motion.circle 
           cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={stroke} fill="transparent"
@@ -467,7 +467,7 @@ export default function AIRecommendationCenter() {
       </header>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <div className="max-w-[1600px] mx-auto w-full p-6 flex flex-col gap-6">
+        <div className="w-full p-6 flex flex-col gap-6">
 
           {/* ================= TOP KPI ROW ================= */}
           <div className="flex items-center gap-2">
@@ -480,7 +480,7 @@ export default function AIRecommendationCenter() {
             </span>
           </div>
 
-          <div className="grid grid-cols-7 gap-4">
+          <div className="grid grid-cols-8 gap-4">
             {[
               { label: "AI Recommendations", value: pendingQueue.length, sub: "Pending actions", color: "green" },
               { label: "High Impact", value: highImpactPending, sub: "From delayed shipments", color: "green", up: highImpactPending > 0 },
@@ -514,10 +514,11 @@ export default function AIRecommendationCenter() {
           </div>
 
           {/* ================= MAIN TWO COLUMNS ================= */}
-          <div className="grid grid-cols-[1.1fr_1.9fr] gap-6 flex-1 min-h-[500px]">
+          <div className="grid grid-cols-[1.3fr_1.7fr] gap-6 flex-1 min-h-[500px]">
             
             {/* LEFT: QUEUE */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+            <div className="relative min-h-[500px]">
+              <div className="absolute inset-0 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
               <div className="p-5 border-b border-gray-100">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -579,23 +580,23 @@ export default function AIRecommendationCenter() {
                             'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                           <item.icon size={18} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-[14px] font-bold text-gray-900 truncate">{item.title}</h3>
+                        <div className="flex-1 min-w-0 pr-2">
+                          <h3 className="text-[14px] font-bold text-gray-900 truncate" title={item.title}>{item.title}</h3>
                           <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mt-1 truncate">
                             <span>{item.from}</span> <ArrowLeft size={10} className="rotate-180"/> <span>{item.to}</span>
                           </div>
                           <div className="flex items-center gap-2 mt-2">
-                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium border border-gray-200">{item.category}</span>
-                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-medium border border-orange-100">{item.priority}</span>
+                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium border border-gray-200 truncate">{item.category}</span>
+                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-medium border border-orange-100 shrink-0">{item.priority}</span>
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                           <div className="text-right">
-                             <div className="text-[9px] text-gray-400 font-bold uppercase">Potential Savings</div>
+                        <div className="flex items-center gap-3 shrink-0">
+                           <div className="text-right hidden sm:block">
+                             <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Potential Savings</div>
                              <div className="text-[14px] font-bold text-green-600">${item.savings.toLocaleString()}</div>
                            </div>
-                           <CircularProgress value={item.confidence} color={C.green} size={28} stroke={3} />
+                           <CircularProgress value={item.confidence} color={C.green} size={38} stroke={4} />
                         </div>
                       </div>
 
@@ -642,6 +643,7 @@ export default function AIRecommendationCenter() {
                 <span>Showing 1 to {filteredQueue.length} of {queue.filter(q=>q.status==='pending').length} recommendations</span>
                 <span className="font-bold text-green-700 flex items-center gap-1">{decisionLog.length} decisions recorded</span>
               </div>
+              </div>
             </div>
 
 
@@ -654,7 +656,7 @@ export default function AIRecommendationCenter() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="flex flex-col h-full"
+                    className="flex flex-col"
                   >
                     {/* Header */}
                     <div className="flex justify-between items-start mb-6">
@@ -847,7 +849,7 @@ export default function AIRecommendationCenter() {
                       </div>
 
                       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-                        <div className="rounded-xl border border-gray-100 bg-white p-4">
+                        <div className="rounded-xl border border-gray-100 bg-white p-4 h-full">
                           <div className="mb-3 flex items-center gap-2">
                             <Calculator size={14} className="text-green-700" />
                             <p className="text-[11px] font-black text-gray-900">How price is decided</p>
@@ -859,7 +861,7 @@ export default function AIRecommendationCenter() {
                           </div>
                         </div>
 
-                        <div className="rounded-xl border border-gray-100 bg-white p-4">
+                        <div className="rounded-xl border border-gray-100 bg-white p-4 h-full">
                           <div className="mb-3 flex items-center gap-2">
                             <Clock size={14} className="text-green-700" />
                             <p className="text-[11px] font-black text-gray-900">How time is decided</p>
@@ -871,7 +873,7 @@ export default function AIRecommendationCenter() {
                           </div>
                         </div>
 
-                        <div className="rounded-xl border border-gray-100 bg-white p-4">
+                        <div className="rounded-xl border border-gray-100 bg-white p-4 h-full">
                           <div className="mb-3 flex items-center gap-2">
                             <ShieldCheck size={14} className="text-green-700" />
                             <p className="text-[11px] font-black text-gray-900">Decision rules fired</p>
@@ -889,7 +891,7 @@ export default function AIRecommendationCenter() {
                     </div>
 
                     {/* Action Bar */}
-                    <div className="mt-auto pt-6 border-t border-gray-100 bg-white">
+                    <div className="mt-8 pt-6 border-t border-gray-100 bg-white">
                       <h4 className="text-[12px] font-bold text-gray-900 mb-3">What would you like to do?</h4>
                       <div className="flex gap-3">
                         <button 

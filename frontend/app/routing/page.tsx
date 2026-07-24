@@ -293,7 +293,7 @@ export default function AI_Route_Discovery() {
           {/* Middle Row: Route Comparison Graph */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex min-h-[360px] shrink-0">
             {/* Left: Scatter Plot (SVG built) */}
-            <div className="w-[340px] p-5 border-r border-slate-100 flex flex-col">
+            <div className="w-[340px] shrink-0 p-5 border-r border-slate-100 flex flex-col z-10 bg-white">
               <div>
                 <h2 className="text-sm font-black text-slate-900">Route Comparison Graph</h2>
                 <p className="text-[10px] text-slate-500 font-semibold mb-6">All routes plotted across time vs cost (click any route)</p>
@@ -336,9 +336,6 @@ export default function AI_Route_Discovery() {
                      
                      return (
                        <g key={i} onClick={() => setSelectedRouteIndex(i)} className="cursor-pointer group">
-                         {/* Trend curve ending at the dot */}
-                         <path d={`M ${Math.max(30, x - 40)} ${Math.max(0, y - 60)} Q ${x - 20} ${y - 10} ${x} ${y}`} fill="none" stroke={color} strokeWidth="2" strokeDasharray={i === 0 ? "none" : "4 4"} opacity="0.6" />
-                         
                          <circle cx={x} cy={y} r="6" fill={color} className="transition-transform group-hover:scale-125 origin-center" style={{ transformOrigin: `${x}px ${y}px` }} />
                          
                          {/* Tooltip background for readability */}
@@ -413,12 +410,12 @@ export default function AI_Route_Discovery() {
                  <div className="absolute top-1 left-0 right-0 h-0.5 bg-white/20 border-t border-dashed border-white/30" />
                  
                  {/* Animated Progress Bar */}
-                 <div className="absolute top-1 left-0 h-0.5 bg-[#10B981] transition-all duration-1000 ease-in-out" style={{ width: simulationStep === 0 ? '0%' : simulationStep === 1 ? '15%' : simulationStep === 2 ? '65%' : '100%' }} />
+                 <div className="absolute top-1 left-3 bg-[#10B981] transition-all duration-1000 ease-in-out" style={{ height: '2px', width: simulationStep === 0 ? '0%' : simulationStep === 1 ? '15%' : simulationStep === 2 ? '65%' : 'calc(100% - 24px)' }} />
                  
                  {/* Playhead Handle */}
                  <div 
                    className="absolute top-1 -mt-3 w-6 h-6 bg-white rounded-md shadow-md flex items-center justify-center text-[#0F2922] cursor-pointer hover:scale-110 transition-all duration-1000 ease-in-out z-20"
-                   style={{ left: simulationStep === 0 ? '0%' : simulationStep === 1 ? '15%' : simulationStep === 2 ? '65%' : '100%', transform: 'translateX(-50%)' }}
+                   style={{ left: simulationStep === 0 ? '12px' : simulationStep === 1 ? 'calc(15% + 12px)' : simulationStep === 2 ? 'calc(65% + 12px)' : 'calc(100% - 12px)', transform: 'translateX(-50%)' }}
                    onClick={playSimulation}
                  >
                    <Play className="w-3 h-3 fill-current ml-0.5" />

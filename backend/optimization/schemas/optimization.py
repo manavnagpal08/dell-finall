@@ -71,3 +71,4 @@ class DemandPositioningData(BaseModel):
     opportunities: List[OpportunityCard]
     recommendations: List[ExecutiveRecommendation]
     waste_cost_by_city: Dict[str, float]
+    approved_opportunity_ids: Optional[List[str]] = []

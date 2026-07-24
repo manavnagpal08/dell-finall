@@ -24,8 +24,8 @@ function FlipCard({ id, title, icon: Icon, color, isActive, isFlipped, onHover, 
   return (
     <div 
       id={`flipcard-${id}`}
-      className="relative w-full h-[250px] perspective-1000 shrink-0 mx-2"
-      style={{ minWidth: "220px", maxWidth: "260px" }}
+      className="relative flex-none w-[260px] h-[250px] perspective-1000 snap-center"
+
       onMouseEnter={() => onHover(id)}
       onMouseLeave={() => onHover(null)}
       onClick={onClick}
@@ -144,7 +144,7 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
   const recommendedRouteHops = Math.max(1, currentRouteHops - (data.alternatives.length > 0 ? 1 : 0));
 
   return (
-    <div className="flex overflow-x-auto pb-6 pt-2 px-2 no-scrollbar -mx-4 items-center h-full snap-x snap-mandatory">
+    <div className="flex gap-5 pb-6 pt-2 h-full w-full overflow-x-auto snap-x snap-mandatory px-1 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
       
       {/* 1. Cost Analysis */}
       <FlipCard 

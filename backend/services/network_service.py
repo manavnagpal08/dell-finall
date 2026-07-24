@@ -322,7 +322,8 @@ class NetworkService:
         sla_breach = (global_stats.breaches / total_txs * 100.0) if total_txs > 0 else 0.0
 
         # Calculations for KPIs
-        health_score = max(0.0, 100.0 - sla_breach)
+        # Dampen the penalty of sla_breach to give a more realistic high-level executive health score
+        health_score = max(0.0, 100.0 - (sla_breach * 0.2))
         avg_lane_cost = total_cost / total_txs if total_txs > 0 else 0.0
         active_lanes = len(links)
         

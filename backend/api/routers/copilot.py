@@ -41,7 +41,7 @@ def copilot_chat(request: ChatRequest):
 
     try:
         from backend.core.config import settings
-        api_key = settings.GEMINI_API_KEY
+        api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
         if not api_key:
             logger.warning("External inference key not found. Returning local evidence response.")
             response_text = f"""### Summary
@@ -74,7 +74,7 @@ def generate_summary(request: SummaryRequest):
 
     try:
         from backend.core.config import settings
-        api_key = settings.GEMINI_API_KEY
+        api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
         if not api_key:
             response_text = f"""### Summary
 Network operating at 85% capacity.

@@ -19,9 +19,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated && !isPublicPage) {
-      setSession(seededOperator, "local-operator-token")
+      router.push("/auth/login")
     }
-  }, [isAuthenticated, isLoading, isPublicPage, setSession])
+  }, [isAuthenticated, isLoading, isPublicPage, router])
 
   React.useEffect(() => {
     setAiPanelOpen(false)
@@ -49,8 +49,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
       <div
         className={cn(
-          "flex-1 flex flex-col min-w-0 transition-all duration-300 min-h-screen",
-          sidebarCollapsed ? "pl-20" : "pl-64"
+          "flex-1 flex flex-col min-w-0 transition-all duration-300 min-h-screen pl-0",
+          sidebarCollapsed ? "md:pl-20" : "md:pl-64"
         )}
       >
         <Navbar />
@@ -63,7 +63,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {aiPanelOpen && (
-        <aside className="fixed bottom-24 right-6 z-50 flex h-[520px] w-80 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-800 shadow-2xl">
+        <aside className="fixed bottom-0 right-0 z-50 flex h-full md:h-[520px] w-full md:w-[360px] md:bottom-24 md:right-6 flex-col overflow-hidden md:rounded-lg border border-slate-200 bg-white text-slate-800 shadow-2xl">
           <AiPanel onClose={toggleAiPanel} />
         </aside>
       )}

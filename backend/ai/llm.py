@@ -17,9 +17,9 @@ def generate_json_response(prompt: str) -> dict | list | None:
         return None
 
     try:
-        # Use gemini-1.5-flash and force JSON response format
+        # Use gemini-2.5-flash and force JSON response format
         model = genai.GenerativeModel(
-            'gemini-1.5-flash',
+            'gemini-2.5-flash',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -34,7 +34,7 @@ def generate_text_response(prompt: str) -> str | None:
         return None
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:

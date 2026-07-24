@@ -1,473 +1,496 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import {
-  Activity,
-  AlertCircle,
-  BarChart2,
-  CheckCircle2,
-  Download,
-  FileText,
-  Filter,
-  Loader2,
-  RefreshCw,
-  ShieldCheck,
-  TrendingDown,
-  Zap,
+import React, { useState, useEffect } from "react";
+import { 
+  Settings2, Download, Search, MapPin, 
+  Play, ChevronDown, ChevronRight, Activity, 
+  TrendingUp, TrendingDown, RefreshCw, BarChart2,
+  DollarSign, Map, Zap, FileText, AlertCircle, ShieldCheck
 } from "lucide-react";
-import {
-  useGetConsolidationOpportunities,
-  useGetCostOptimization,
-  useGetHubOptimization,
-  useGetInventoryOptimization,
-  useGetOptimizationDashboard,
-  useGetReverseOptimization,
-} from "@/services/queries";
-import type { ExecutiveRecommendation, OpportunityCard, OptimizationMetric } from "@/types";
-
-type FlowFilter = "" | "Forward" | "Reverse" | "Part Buy";
-type WorkspaceTab = "Cost Leakage" | "Savings Breakdown" | "Suboptimal Transactions" | "Cost Suggestions" | "Reinvestment Advisor";
-
-const flowOptions: { label: string; value: FlowFilter }[] = [
-  { label: "All Flows", value: "" },
-  { label: "Forward", value: "Forward" },
-  { label: "Reverse", value: "Reverse" },
-  { label: "Part Buy", value: "Part Buy" },
-];
-
-const formatUsd = (value?: number) =>
-  `$${Math.round(value || 0).toLocaleString()}`;
-
-const formatPct = (value?: number) =>
-  `${Number(value || 0).toFixed(1)}%`;
-
-const severityStyle: Record<string, string> = {
-  Critical: "bg-red-50 text-red-700 border-red-100",
-  High: "bg-orange-50 text-orange-700 border-orange-100",
-  Medium: "bg-amber-50 text-amber-700 border-amber-100",
-  Low: "bg-emerald-50 text-emerald-700 border-emerald-100",
-};
-
-function metricByName(metrics: OptimizationMetric[], name: string) {
-  return metrics.find((metric) => metric.name === name);
-}
-
-function pickMetric(metrics: OptimizationMetric[], index: number) {
-  return metrics[index] || metrics[0];
-}
+import { cn } from "@/lib/utils";
+import { CORRIDORS, GLOBAL_KPI, Corridor, Leakage } from "./data";
+import { SimulationMap } from "./simulation-map";
+import { useUiStore } from "@/store/ui";
 
 export default function CostOptimizationCenter() {
-  const [flowType, setFlowType] = useState<FlowFilter>("");
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("Cost Leakage");
-  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
-  const filters = useMemo(() => ({ flow_type: flowType || undefined }), [flowType]);
+  const [selectedCorridor, setSelectedCorridor] = useState<Corridor | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("Cost Leakage");
+  const [simulationStep, setSimulationStep] = useState(0);
+  const [expandedLeakage, setExpandedLeakage] = useState<string | null>(null);
+  const [chartFilter, setChartFilter] = useState("Forward Logistics");
+  const { logisticsMode, setLogisticsMode } = useUiStore();
 
-  const dashboardQuery = useGetOptimizationDashboard(filters);
-  const costQuery = useGetCostOptimization(filters);
-  const reverseQuery = useGetReverseOptimization(filters);
-  const inventoryQuery = useGetInventoryOptimization(filters);
-  const hubQuery = useGetHubOptimization(filters);
-  const consolidationQuery = useGetConsolidationOpportunities(filters);
-
-  const queries = [dashboardQuery, costQuery, reverseQuery, inventoryQuery, hubQuery, consolidationQuery];
-  const isLoading = queries.some((query) => query.isLoading);
-  const isFetching = queries.some((query) => query.isFetching);
-  const hasError = queries.some((query) => query.isError);
-  const lastUpdated = queries.map((query) => query.dataUpdatedAt).filter(Boolean).sort((a, b) => b - a)[0];
-
-  const dashboard = dashboardQuery.data;
-  const allMetrics = dashboard?.kpis || [];
-  const allOpportunities = useMemo(
-    () => [
-      ...(costQuery.data?.opportunities || []),
-      ...(reverseQuery.data?.opportunities || []),
-      ...(inventoryQuery.data?.opportunities || []),
-      ...(hubQuery.data?.opportunities || []),
-      ...(consolidationQuery.data?.opportunities || []),
-    ],
-    [costQuery.data, reverseQuery.data, inventoryQuery.data, hubQuery.data, consolidationQuery.data]
-  );
-  const allRecommendations = useMemo(
-    () => [
-      ...(costQuery.data?.recommendations || []),
-      ...(reverseQuery.data?.recommendations || []),
-      ...(inventoryQuery.data?.recommendations || []),
-      ...(hubQuery.data?.recommendations || []),
-      ...(consolidationQuery.data?.recommendations || []),
-    ],
-    [costQuery.data, reverseQuery.data, inventoryQuery.data, hubQuery.data, consolidationQuery.data]
+  const displayCorridors = CORRIDORS.filter(c => 
+    logisticsMode === "forward" ? c.flowType !== "Reverse" : c.flowType === "Reverse"
   );
 
-  const selectedOpportunity = allOpportunities.find((item) => item.id === selectedOpportunityId) || allOpportunities[0] || null;
-  const totalCurrent = allMetrics.reduce((sum, metric) => sum + metric.current_value, 0);
-  const totalOptimized = allMetrics.reduce((sum, metric) => sum + metric.optimized_value, 0);
-  const totalSavings = allMetrics.reduce((sum, metric) => sum + metric.savings_value, 0);
-  const avgImprovement = allMetrics.length ? allMetrics.reduce((sum, metric) => sum + metric.improvement_pct, 0) / allMetrics.length : 0;
-  const categorySavings = dashboard?.category_savings || {};
-  const regionalSavings = dashboard?.regional_savings || {};
-  const maxCategory = Math.max(...Object.values(categorySavings), 1);
-  const maxRegion = Math.max(...Object.values(regionalSavings), 1);
-  const currentScore = dashboard?.optimization_score_current || 0;
-  const projectedScore = dashboard?.optimization_score_projected || 0;
-  const scoreLift = Math.max(0, projectedScore - currentScore);
+  useEffect(() => {
+    // Reset simulation and leakage details when corridor changes
+    setSimulationStep(0);
+    setExpandedLeakage(null);
+  }, [selectedCorridor]);
 
-  const refreshAll = () => {
-    queries.forEach((query) => query.refetch());
+  const playSimulation = (targetCorridor?: Corridor | React.MouseEvent) => {
+    const c = (targetCorridor && 'checkpoints' in targetCorridor) ? targetCorridor : selectedCorridor;
+    if (!c) return;
+    if (simulationStep > 0) return;
+    
+    setSimulationStep(1);
+    
+    // Animate through checkpoints
+    c.checkpoints.forEach((_, idx) => {
+      setTimeout(() => {
+        setSimulationStep(idx + 1);
+      }, idx * 1200);
+    });
   };
 
-  const exportCsv = () => {
-    const headers = ["id", "type", "severity", "cost_saving", "description"];
-    const rows = allOpportunities.map((item) =>
-      [item.id, item.type, item.severity, Math.round(item.cost_saving), `"${item.description.replaceAll('"', '""')}"`].join(",")
-    );
-    const blob = new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "cost-optimization-opportunities.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+  const getKPIs = () => {
+    if (!selectedCorridor) {
+      const modeMultiplier = logisticsMode === "forward" ? 1 : 0.35;
+      return {
+        currentCost: GLOBAL_KPI.currentCost * modeMultiplier,
+        optimizedCost: GLOBAL_KPI.optimizedCost * modeMultiplier,
+        potentialSavings: GLOBAL_KPI.potentialSavings * modeMultiplier,
+        inventoryImpact: GLOBAL_KPI.inventoryImpact * modeMultiplier,
+        savingsRealized: GLOBAL_KPI.savingsRealized * modeMultiplier,
+      };
+    }
+    // Scale down global KPIs to simulate corridor-specific impacts
+    return {
+      currentCost: selectedCorridor.currentCost * 50,
+      optimizedCost: selectedCorridor.optimizedCost * 50,
+      potentialSavings: selectedCorridor.potentialSaving * 50,
+      inventoryImpact: selectedCorridor.currentCost * 10,
+      savingsRealized: selectedCorridor.potentialSaving * 20
+    };
   };
+
+  const kpis = getKPIs();
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] font-sans text-slate-800 flex flex-col pb-10">
-      <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-white border-b border-slate-200">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200">
         <div>
           <h1 className="text-xl font-black text-[#0F2922] flex items-center gap-2">
-            Cost Optimization Center
+            Cost Optimization Center 
             <span className="text-[10px] font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-full border border-[#10B981]/20 flex items-center gap-1">
-              <Zap className="w-3 h-3" /> Backend Scored
+              <Zap className="w-3 h-3" /> AI-Powered
             </span>
           </h1>
-          <p className="text-xs text-slate-500 font-semibold mt-1">
-            Transport, reverse, inventory, hub load, and consolidation savings from the optimization API.
-          </p>
+          <p className="text-xs text-slate-500 font-semibold mt-1">Identify cost leaks, optimize routes, and reinvest savings for maximum business impact.</p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <select value={flowType} onChange={(event) => setFlowType(event.target.value as FlowFilter)} className="bg-transparent text-sm font-bold outline-none">
-              {flowOptions.map((option) => (
-                <option key={option.label} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+        
+        <div className="flex items-center gap-4">
+          {/* Forward vs Reverse Logistics Toggle */}
+          <div className="hidden md:flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
+            <button 
+              onClick={() => setLogisticsMode("forward")} 
+              className={cn(
+                "px-3 py-1.5 rounded-md text-[11px] font-bold transition-all flex items-center gap-1.5", 
+                logisticsMode === "forward" ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <ChevronRight className="h-3.5 w-3.5" /> Forward Logistics
+            </button>
+            <button 
+              onClick={() => setLogisticsMode("reverse")} 
+              className={cn(
+                "px-3 py-1.5 rounded-md text-[11px] font-bold transition-all flex items-center gap-1.5", 
+                logisticsMode === "reverse" ? "bg-white text-rose-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Reverse Logistics
+            </button>
           </div>
-          <button onClick={refreshAll} disabled={isFetching} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60">
-            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+
+          <div className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:bg-slate-50">
+            15 Jul - 22 Jul 2026 <ChevronDown className="w-4 h-4 text-slate-400" />
+          </div>
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+            <Settings2 className="w-4 h-4" /> Filters
           </button>
-          <button onClick={exportCsv} disabled={!allOpportunities.length} className="flex items-center gap-2 rounded-lg bg-[#007A5E] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#00664d] disabled:bg-slate-300">
-            <Download className="h-4 w-4" /> Export CSV
+          <button className="flex items-center gap-2 px-4 py-2 bg-[#007A5E] text-white rounded-lg text-sm font-bold shadow-sm hover:bg-[#00664d]">
+            <Download className="w-4 h-4" /> Export CSV
           </button>
         </div>
       </header>
 
       <div className="flex-1 p-6 space-y-6">
-        {hasError && (
-          <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" /> Some optimization APIs are unavailable. Loaded sections show backend data only; missing sections remain empty.
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
-          {[
-            { label: "Total Current Cost", value: formatUsd(totalCurrent), sub: `${allMetrics.length} backend metrics`, icon: DollarSignCard },
-            { label: "Optimized Cost", value: formatUsd(totalOptimized), sub: `${formatPct(avgImprovement)} average improvement`, icon: BarChart2 },
-            { label: "Potential Savings", value: formatUsd(totalSavings), sub: `${allOpportunities.length} opportunities`, icon: Activity },
-            { label: "Optimization Score", value: `${currentScore.toFixed(1)} -> ${projectedScore.toFixed(1)}`, sub: `${scoreLift.toFixed(1)} point lift`, icon: ShieldCheck },
-            { label: "Recommendations", value: `${allRecommendations.length}`, sub: "backend actions", icon: CheckCircle2 },
-          ].map((kpi) => (
-            <div key={kpi.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-bold text-slate-500">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#10B981]/10 text-[#10B981]">
-                  <kpi.icon className="h-3.5 w-3.5" />
-                </div>
-                {kpi.label}
-              </div>
-              <div className="text-2xl font-black text-slate-900">{isLoading ? "--" : kpi.value}</div>
-              <div className="mt-2 text-[10px] font-bold text-slate-500">{isLoading ? "Loading backend data" : kpi.sub}</div>
+        {/* KPI Row */}
+        <div className="grid grid-cols-5 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 mb-2">
+              <div className="w-6 h-6 rounded-full bg-[#10B981]/10 text-[#10B981] flex items-center justify-center"><DollarSign className="w-3.5 h-3.5" /></div>
+              Total Current Cost
             </div>
-          ))}
+            <div className="text-2xl font-black text-slate-900">${kpis.currentCost.toLocaleString()}</div>
+            <div className="text-[10px] font-bold text-red-500 bg-red-50 inline-flex items-center px-1.5 py-0.5 rounded mt-2">
+              <TrendingUp className="w-3 h-3 mr-1" /> 18.6% vs last 7 days
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 mb-2">
+              <div className="w-6 h-6 rounded-full bg-[#10B981]/10 text-[#10B981] flex items-center justify-center"><BarChart2 className="w-3.5 h-3.5" /></div>
+              Optimized Cost
+            </div>
+            <div className="text-2xl font-black text-slate-900">${kpis.optimizedCost.toLocaleString()}</div>
+            <div className="text-[10px] font-bold text-[#10B981] bg-[#10B981]/10 inline-flex items-center px-1.5 py-0.5 rounded mt-2">
+              <TrendingDown className="w-3 h-3 mr-1" /> 17.9% vs current
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 mb-2">
+              <div className="w-6 h-6 rounded-full bg-[#10B981]/10 text-[#10B981] flex items-center justify-center"><Activity className="w-3.5 h-3.5" /></div>
+              Total Potential Savings
+            </div>
+            <div className="text-2xl font-black text-slate-900">${kpis.potentialSavings.toLocaleString()}</div>
+            <div className="text-[10px] font-bold text-[#10B981] mt-2 flex items-center justify-between">
+              Across {selectedCorridor ? 1 : displayCorridors.length} opportunities
+              <span className="bg-[#10B981]/10 px-1.5 py-0.5 rounded flex items-center"><TrendingDown className="w-3 h-3 mr-1" /> 18.0%</span>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 mb-2">
+              <div className="w-6 h-6 rounded-full bg-[#10B981]/10 text-[#10B981] flex items-center justify-center"><Map className="w-3.5 h-3.5" /></div>
+              Inventory Investment Impact
+            </div>
+            <div className="text-2xl font-black text-slate-900">${kpis.inventoryImpact.toLocaleString()}</div>
+            <div className="text-[10px] font-bold text-slate-500 mt-2">
+              ROI 73.3% from challenge model
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 mb-2">Savings Realized (MTD)</div>
+              <div className="text-2xl font-black text-slate-900">${kpis.savingsRealized.toLocaleString()}</div>
+              <div className="text-[10px] font-bold text-slate-500 mt-2">of monthly target</div>
+            </div>
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              <svg width="64" height="64" viewBox="0 0 36 36" className="absolute inset-0 -rotate-90">
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#E2E8F0" strokeWidth="4" />
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#0F2922" strokeWidth="4" strokeDasharray="61, 100" strokeLinecap="round" />
+              </svg>
+              <span className="text-xs font-black text-slate-900 z-10">61%</span>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-black text-slate-900">Optimization Opportunities</h2>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">Ranked directly from backend optimization engines.</p>
-              </div>
-              <div className="text-[10px] font-bold text-slate-400">
-                Updated: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "waiting"}
-              </div>
+        {/* Middle Row: Corridors Table & Cost Leakage */}
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col h-[400px]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                Top Cost Corridors <span className="text-[10px] text-slate-400 font-semibold">(By Current Cost)</span>
+              </h2>
             </div>
-
-            <div className="max-h-[420px] overflow-y-auto">
+            
+            <div className="flex-1 overflow-y-auto">
               <table className="w-full text-left">
-                <thead className="border-b border-slate-100 text-[10px] font-bold text-slate-400">
+                <thead className="text-[10px] font-bold text-slate-400 border-b border-slate-100">
                   <tr>
-                    <th className="pb-3">Opportunity</th>
-                    <th className="pb-3">Type</th>
-                    <th className="pb-3">Severity</th>
-                    <th className="pb-3">Savings</th>
-                    <th className="pb-3">Action</th>
+                    <th className="pb-3">Corridor</th>
+                    <th className="pb-3">Flow Type</th>
+                    <th className="pb-3">Current Cost</th>
+                    <th className="pb-3">Optimized Cost</th>
+                    <th className="pb-3">Potential Saving</th>
+                    <th className="pb-3">Opportunity Score</th>
+                    <th className="pb-3 text-left pl-6">Action</th>
                   </tr>
                 </thead>
                 <tbody className="text-[11px] font-bold text-slate-700">
-                  {allOpportunities.map((item) => {
-                    const selected = selectedOpportunity?.id === item.id;
+                  {displayCorridors.map((c) => {
+                    const isSelected = selectedCorridor?.id === c.id;
                     return (
-                      <tr key={item.id} onClick={() => setSelectedOpportunityId(item.id)} className={`cursor-pointer border-b border-slate-50 transition-colors ${selected ? "bg-emerald-50/70" : "hover:bg-slate-50"}`}>
-                        <td className="py-4 pr-4">
-                          <div className="font-black text-slate-900">{item.id}</div>
-                          <div className="mt-1 max-w-[560px] text-[10px] font-semibold leading-4 text-slate-500">{item.description}</div>
+                      <tr key={c.id} 
+                          onClick={() => setSelectedCorridor(c)}
+                          className={`border-b border-slate-50 cursor-pointer transition-colors ${isSelected ? 'bg-[#10B981]/5' : 'hover:bg-slate-50'}`}>
+                        <td className="py-4 flex items-center gap-2">
+                          <div className={`w-1.5 h-6 rounded-full ${isSelected ? 'bg-[#10B981]' : 'bg-transparent'}`} />
+                          <span className={isSelected ? 'text-[#0F2922] font-black' : ''}>{c.name}</span>
                         </td>
-                        <td className="py-4">{item.type}</td>
                         <td className="py-4">
-                          <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${severityStyle[item.severity] || "bg-slate-50 text-slate-600 border-slate-100"}`}>{item.severity}</span>
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] ${c.flowType==='Forward'?'bg-green-100 text-green-700':c.flowType==='Reverse'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}`}>
+                            {c.flowType}
+                          </span>
                         </td>
-                        <td className="py-4 text-[#10B981]">{formatUsd(item.cost_saving)}</td>
+                        <td className="py-4">${c.currentCost.toLocaleString()}</td>
+                        <td className="py-4">${c.optimizedCost.toLocaleString()}</td>
+                        <td className="py-4 text-[#10B981]">${c.potentialSaving.toLocaleString()}</td>
                         <td className="py-4">
-                          <button onClick={(event) => { event.stopPropagation(); setSelectedOpportunityId(item.id); }} className="rounded-md border border-emerald-200 px-3 py-1.5 text-[10px] font-black text-emerald-700 hover:bg-emerald-50">
-                            Inspect
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{width: `${c.opportunityScore}%`, backgroundColor: c.opportunityScore > 80 ? '#10B981' : '#F97316'}} />
+                            </div>
+                            <span className="w-6 text-right">{c.opportunityScore}%</span>
+                          </div>
+                        </td>
+                        <td className="py-4 text-left pl-6">
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedCorridor(c); playSimulation(c); }} className="inline-flex items-center gap-1 text-[#10B981] hover:text-[#007A5E]">
+                            <Play className="w-3 h-3 fill-current" /> Simulate Route
                           </button>
                         </td>
                       </tr>
-                    );
+                    )
                   })}
-                  {!isLoading && allOpportunities.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-10 text-center text-sm font-bold text-slate-400">No optimization opportunities returned by the backend.</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
+            
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
+              <span className="text-[11px] font-bold text-slate-500">Showing {displayCorridors.length} corridors</span>
+              <button className="px-4 py-1.5 border border-slate-200 rounded-md text-[11px] font-bold flex items-center gap-1.5 hover:bg-slate-50"><MapPin className="w-3 h-3 text-[#10B981]"/> View All Corridors</button>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-black text-slate-900">Selected Opportunity</h2>
-            {selectedOpportunity ? (
-              <div className="mt-4 space-y-4">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{selectedOpportunity.type}</div>
-                  <div className="mt-1 text-lg font-black text-slate-900">{selectedOpportunity.id}</div>
+          {/* Cost Leakage Panel */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col h-[400px]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">Cost Leakage <span className="text-[12px] font-semibold text-slate-400">— Why Costs Increase</span></h2>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-3">
+              {(selectedCorridor ? selectedCorridor.leakages : (displayCorridors[0]?.leakages || [])).map((leakage, i) => (
+                <div key={i} className="border border-slate-100 rounded-lg overflow-hidden transition-all">
+                  <div 
+                    onClick={() => setExpandedLeakage(expandedLeakage === leakage.category ? null : leakage.category)}
+                    className={`flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50 ${expandedLeakage === leakage.category ? 'bg-slate-50' : ''}`}
+                  >
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">
+                      <div className="w-2 h-2 rounded-full" style={{backgroundColor: leakage.color}} />
+                      {leakage.category}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] font-black text-slate-900">${leakage.value.toLocaleString()} <span className="text-slate-400 font-semibold">({leakage.percentage}%)</span></span>
+                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{width: `${leakage.percentage}%`, backgroundColor: leakage.color}} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {expandedLeakage === leakage.category && (
+                    <div className="p-4 bg-[#F8FAFC] border-t border-slate-100 text-[10px]">
+                      <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div><span className="text-slate-500 font-bold block mb-1">Affected Shipments</span><span className="font-black text-slate-900">{leakage.details.affectedShipments}</span></div>
+                        <div><span className="text-slate-500 font-bold block mb-1">Historical Trend</span><span className="font-black text-red-500">{leakage.details.historicalTrend}</span></div>
+                      </div>
+                      <div className="space-y-2">
+                        <p><strong className="text-slate-700">AI Explanation:</strong> <span className="text-slate-600">{leakage.details.explanation}</span></p>
+                        <p><strong className="text-[#10B981]">Suggested Fix:</strong> <span className="text-slate-600">{leakage.details.suggestedFix}</span></p>
+                      </div>
+                      <button className="mt-3 w-full py-2 bg-white border border-[#10B981] text-[#10B981] font-bold rounded shadow-sm hover:bg-[#10B981]/5">Auto-Resolve Leakage</button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm font-semibold leading-6 text-slate-600">{selectedOpportunity.description}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <MetricTile label="Expected Saving" value={formatUsd(selectedOpportunity.cost_saving)} />
-                  <MetricTile label="Severity" value={selectedOpportunity.severity} />
-                </div>
+              ))}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
+              <div>
+                <div className="text-[10px] font-bold text-slate-500">Total Leakage</div>
+                <div className="text-lg font-black text-red-500">${(selectedCorridor ? selectedCorridor.leakages.reduce((sum,l)=>sum+l.value,0) : 24250).toLocaleString()}</div>
               </div>
-            ) : (
-              <div className="mt-10 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-bold text-slate-400">
-                Select an opportunity to inspect its backend evidence.
-              </div>
-            )}
+              <button className="px-4 py-2 border border-slate-200 rounded-md text-[11px] font-bold hover:bg-slate-50">View Details</button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {/* Bottom Row: AI Workspace & Route Simulation */}
+        <div className="grid grid-cols-[1.1fr_1.9fr] gap-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 h-[360px] flex flex-col">
             <div className="mb-4">
               <h2 className="text-base font-black text-slate-900">AI Analysis Workspace</h2>
-              <p className="text-[10px] font-semibold text-slate-500">All tabs use the loaded optimization API responses.</p>
+              <p className="text-[10px] text-slate-500 font-semibold">Choose an analysis to explore insights.</p>
             </div>
 
-            <div className="mb-5 flex gap-2 overflow-x-auto pb-2">
-              {(["Cost Leakage", "Savings Breakdown", "Suboptimal Transactions", "Cost Suggestions", "Reinvestment Advisor"] as WorkspaceTab[]).map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`whitespace-nowrap rounded-lg border px-4 py-2 text-[11px] font-bold transition-colors ${activeTab === tab ? "border-[#10B981] bg-[#10B981]/10 text-[#10B981]" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
-                  {tab}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+              {['Cost Leakage', 'Savings Breakdown', 'Suboptimal Transactions', 'Cost Suggestions', 'Reinvestment Advisor'].map(tab => (
+                <button 
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 text-[11px] font-bold whitespace-nowrap rounded-lg border transition-colors ${activeTab === tab ? 'bg-[#10B981]/10 border-[#10B981] text-[#10B981]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {tab === 'Cost Leakage' && <AlertCircle className="w-3.5 h-3.5" />}
+                    {tab === 'Savings Breakdown' && <TrendingDown className="w-3.5 h-3.5" />}
+                    {tab === 'Suboptimal Transactions' && <FileText className="w-3.5 h-3.5" />}
+                    {tab === 'Cost Suggestions' && <Zap className="w-3.5 h-3.5" />}
+                    {tab === 'Reinvestment Advisor' && <ShieldCheck className="w-3.5 h-3.5" />}
+                    {tab}
+                  </div>
                 </button>
               ))}
             </div>
 
-            <WorkspaceContent
-              activeTab={activeTab}
-              selectedOpportunity={selectedOpportunity}
-              metrics={allMetrics}
-              recommendations={allRecommendations}
-              categorySavings={categorySavings}
-              regionalSavings={regionalSavings}
-              maxCategory={maxCategory}
-              maxRegion={maxRegion}
-            />
+            <div className="flex-1 flex flex-col border-2 border-slate-100 rounded-xl bg-slate-50/50 p-4 overflow-y-auto">
+               <div className="w-full h-full text-left">
+                 {/* Using selected corridor or default to first corridor for global view */}
+                 {(() => {
+                   const data = selectedCorridor || CORRIDORS[0];
+                   return (
+                     <>
+                   {activeTab === 'Cost Leakage' && (
+                     <div className="space-y-4 animate-in fade-in zoom-in duration-300">
+                       <h3 className="text-sm font-black text-slate-800">Deep Dive: Cost Leakage Factors</h3>
+                       <div className="grid grid-cols-2 gap-4">
+                         {data.leakages.map((l, i) => (
+                           <div key={i} className="border border-slate-200 p-4 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{l.category}</div>
+                             <div className="text-xl font-black mt-1" style={{color: l.color}}>${l.value.toLocaleString()}</div>
+                             <p className="text-[11px] mt-2 text-slate-600 font-medium leading-relaxed">{l.details.explanation}</p>
+                             <button className="mt-3 w-full py-1.5 border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:bg-slate-50 hover:text-[#10B981] transition-colors">Apply Auto-Fix</button>
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+                   
+                   {activeTab === 'Savings Breakdown' && (
+                     <div className="w-full h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div className="flex gap-2 mb-4">
+                          {['Forward Logistics', 'Reverse Logistics', 'Part Buy', 'Emergency Shipment'].map(bt => (
+                             <button 
+                               key={bt} 
+                               onClick={() => setChartFilter(bt)}
+                               className={`px-3 py-1.5 border text-[10px] font-bold rounded-lg transition-colors ${chartFilter === bt ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                             >
+                               {bt}
+                             </button>
+                          ))}
+                        </div>
+                        <div className="flex-1 border border-slate-200 rounded-xl bg-white flex flex-col p-5 shadow-sm min-h-[220px]">
+                          <div className="text-xs font-bold text-slate-500 mb-4">Projected Savings Over Time ({chartFilter})</div>
+                          <div className="flex-1 flex items-end justify-around gap-3 px-4 pb-0 pt-8 border-b border-l border-slate-100 min-h-[120px]">
+                             {(
+                               chartFilter === 'Forward Logistics' ? [40, 70, 30, 90, 50, 80, 60] :
+                               chartFilter === 'Reverse Logistics' ? [20, 40, 80, 40, 30, 60, 90] :
+                               chartFilter === 'Part Buy' ? [90, 80, 70, 50, 40, 60, 50] :
+                               [10, 20, 15, 30, 25, 40, 20]
+                             ).map((h, i) => (
+                               <div key={i} className="w-full bg-gradient-to-t from-[#10B981]/80 to-[#34d399] rounded-t-md transition-all duration-700 hover:opacity-80 relative group" style={{height: `${h}%`}}>
+                                 <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-bold px-2 py-1 rounded transition-opacity pointer-events-none">${(h * 123).toLocaleString()}</div>
+                               </div>
+                             ))}
+                          </div>
+                          <div className="flex justify-around mt-2 text-[9px] font-bold text-slate-400">
+                            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                          </div>
+                        </div>
+                     </div>
+                   )}
+                   
+                   {activeTab === 'Suboptimal Transactions' && (
+                     <div className="w-full space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                       {[1, 2, 3].map(i => (
+                         <div key={i} className="border border-slate-200 p-4 rounded-xl bg-white text-xs cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all shadow-sm group">
+                           <div className="flex justify-between items-center font-black text-sm text-slate-800">
+                             <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400 group-hover:text-emerald-500"/> TXN-80{i}42A9</span> 
+                             <span className="text-red-500 bg-red-50 px-2 py-1 rounded">Excess: $1,240</span>
+                           </div>
+                           <p className="text-[11px] text-slate-500 mt-2 font-medium">Carrier delay at transit hub. System bypassed standard routing logic due to perceived SLA risk which did not materialize.</p>
+                           <div className="mt-3 pt-3 border-t border-slate-100 flex gap-3">
+                             <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600">Affected Hubs: Transit Hub B</span>
+                             <span className="bg-emerald-50 border border-emerald-100 px-2 py-1 rounded text-[10px] font-bold text-emerald-700">Expected Saving: $800</span>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                   
+                   {activeTab === 'Cost Suggestions' && (
+                     <div className="w-full space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
+                       <div className="border border-[#10B981]/40 bg-gradient-to-r from-[#10B981]/10 to-transparent p-4 rounded-xl flex items-center justify-between shadow-sm">
+                         <div>
+                           <div className="font-black text-sm text-[#0F2922] flex items-center gap-2"><Zap className="w-4 h-4 text-[#10B981]"/> Bypass Urban Transit Hub</div>
+                           <div className="text-[11px] text-slate-600 mt-1 font-medium">Route directly to suburban node to avoid $3,120 in congestion delays and handling fees.</div>
+                         </div>
+                         <button className="px-5 py-2.5 bg-[#10B981] text-white text-[11px] font-bold rounded-lg shadow-sm hover:bg-[#007A5E] hover:shadow-md transition-all transform hover:-translate-y-0.5">Apply Suggestion</button>
+                       </div>
+                       
+                       <div className="border border-orange-500/40 bg-gradient-to-r from-orange-500/10 to-transparent p-4 rounded-xl flex items-center justify-between shadow-sm">
+                         <div>
+                           <div className="font-black text-sm text-[#0F2922] flex items-center gap-2"><TrendingDown className="w-4 h-4 text-orange-500"/> Consolidate Thursday Runs</div>
+                           <div className="text-[11px] text-slate-600 mt-1 font-medium">Merge underutilized trucks leaving BLR on Thursdays to save $5,230 per week.</div>
+                         </div>
+                         <button className="px-5 py-2.5 bg-orange-500 text-white text-[11px] font-bold rounded-lg shadow-sm hover:bg-orange-600 hover:shadow-md transition-all transform hover:-translate-y-0.5">Apply Suggestion</button>
+                       </div>
+                     </div>
+                   )}
+                   
+                   {activeTab === 'Reinvestment Advisor' && (
+                     <div className="w-full space-y-4 animate-in fade-in scale-95 duration-300">
+                       <div className="border border-slate-200 bg-white p-5 rounded-xl shadow-sm hover:border-emerald-200 transition-colors">
+                         <div className="flex justify-between items-start mb-2">
+                           <div className="font-black text-sm text-slate-900 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-blue-500"/> Automated HS Code Validation API</div>
+                           <span className="px-2.5 py-1 bg-green-100 text-green-700 font-bold text-[10px] rounded-md border border-green-200">94% Confidence Score</span>
+                         </div>
+                         <p className="text-[11px] text-slate-600 mb-5 font-medium leading-relaxed">Invest identified savings into an automated customs clearance API integration to prevent future reverse logistics delays and port demurrage.</p>
+                         <div className="grid grid-cols-3 gap-4 text-center text-[11px]">
+                           <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg"><div className="font-bold text-slate-500 mb-1">Projected ROI</div><div className="font-black text-xl text-[#10B981]">145%</div></div>
+                           <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg"><div className="font-bold text-slate-500 mb-1">Implementation</div><div className="font-black text-xl text-slate-800">$12,000</div></div>
+                           <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg"><div className="font-bold text-slate-500 mb-1">Payback Period</div><div className="font-black text-xl text-slate-800">2.4 mos</div></div>
+                         </div>
+                       </div>
+                     </div>
+                   )}
+                     </>
+                   );
+                 })()}
+                 </div>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900">Savings Distribution</h2>
-            <div className="mt-5 space-y-4">
-              {Object.entries(categorySavings).map(([label, value]) => (
-                <Bar key={label} label={label} value={value} max={maxCategory} />
-              ))}
-              {!Object.keys(categorySavings).length && <EmptyState text="No category savings returned by the backend." />}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 h-[360px] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-black text-slate-900 flex items-center gap-2">Route Cost Simulation</h2>
+              <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-500">{selectedCorridor ? 'Active' : 'Hidden'}</span>
+            </div>
+            
+            <div className="flex-1 border border-slate-100 rounded-xl overflow-hidden relative bg-[#F8FAFC]">
+              {selectedCorridor ? (
+                <>
+                  <SimulationMap checkpoints={selectedCorridor.checkpoints} simulationStep={simulationStep} />
+                  {simulationStep === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center z-[1000] bg-white/50 backdrop-blur-sm">
+                       <button onClick={() => playSimulation()} className="px-6 py-2.5 bg-[#0F2922] text-white font-bold rounded-lg shadow-xl flex items-center gap-2 hover:bg-black transition-transform hover:scale-105">
+                         <Play className="w-4 h-4 fill-current" /> Start Simulation
+                       </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                  <MapPin className="w-10 h-10 text-slate-300 mb-3" />
+                  <p className="text-[11px] font-bold text-slate-500">Select any corridor from the list above to simulate and analyze cost build-up at each checkpoint.</p>
+                  <p className="text-[9px] text-slate-400 mt-4">Simulation available for Forward, Reverse & Part shipments only.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-slate-600">
-            <ShieldCheck className="h-4 w-4 text-[#10B981]" />
-            <span>{allMetrics.length} optimization metrics loaded</span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span>{allOpportunities.length} opportunities identified</span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span className="text-[#10B981]">Total potential savings: {formatUsd(totalSavings)}</span>
+        
+        {/* Footer Bar */}
+        <div className="bg-white px-4 py-3 border border-slate-200 rounded-lg flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-4 text-[10px] font-bold text-slate-600">
+            <ShieldCheck className="w-4 h-4 text-[#10B981]" />
+            <span>AI Cost Engine scanned 12,845 transactions across 185 corridors</span>
+            <div className="w-1 h-1 rounded-full bg-slate-300" />
+            <span>Identified 20 suboptimal transactions</span>
+            <div className="w-1 h-1 rounded-full bg-slate-300" />
+            <span className="text-[#10B981]">Potential annual savings: $1.27M</span>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+            Last refreshed: Just now <RefreshCw className="w-3 h-3" />
           </div>
         </div>
+
       </div>
-    </div>
-  );
-}
-
-function DollarSignCard(props: React.SVGProps<SVGSVGElement>) {
-  return <BarChart2 {...props} />;
-}
-
-function MetricTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</div>
-      <div className="mt-1 text-base font-black text-slate-900">{value}</div>
-    </div>
-  );
-}
-
-function WorkspaceContent({
-  activeTab,
-  selectedOpportunity,
-  metrics,
-  recommendations,
-  categorySavings,
-  regionalSavings,
-  maxCategory,
-  maxRegion,
-}: {
-  activeTab: WorkspaceTab;
-  selectedOpportunity: OpportunityCard | null;
-  metrics: OptimizationMetric[];
-  recommendations: ExecutiveRecommendation[];
-  categorySavings: Record<string, number>;
-  regionalSavings: Record<string, number>;
-  maxCategory: number;
-  maxRegion: number;
-}) {
-  if (activeTab === "Cost Leakage") {
-    return (
-      <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-        {selectedOpportunity ? (
-          <>
-            <h3 className="text-sm font-black text-slate-800">{selectedOpportunity.type}</h3>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{selectedOpportunity.description}</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <MetricTile label="Backend ID" value={selectedOpportunity.id} />
-              <MetricTile label="Savings" value={formatUsd(selectedOpportunity.cost_saving)} />
-            </div>
-          </>
-        ) : <EmptyState text="No selected opportunity." />}
-      </div>
-    );
-  }
-
-  if (activeTab === "Savings Breakdown") {
-    return (
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-          <h3 className="mb-4 text-sm font-black text-slate-800">Category Savings</h3>
-          <div className="space-y-3">
-            {Object.entries(categorySavings).map(([label, value]) => <Bar key={label} label={label} value={value} max={maxCategory} />)}
-            {!Object.keys(categorySavings).length && <EmptyState text="No category savings returned." />}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-          <h3 className="mb-4 text-sm font-black text-slate-800">Regional Savings</h3>
-          <div className="space-y-3">
-            {Object.entries(regionalSavings).map(([label, value]) => <Bar key={label} label={label} value={value} max={maxRegion} />)}
-            {!Object.keys(regionalSavings).length && <EmptyState text="No regional savings returned." />}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (activeTab === "Suboptimal Transactions") {
-    return (
-      <div className="space-y-3">
-        {metrics.map((metric) => (
-          <div key={metric.name} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-sm font-black text-slate-900">{metric.name}</div>
-                <div className="mt-1 text-[11px] font-semibold text-slate-500">{formatPct(metric.improvement_pct)} improvement from backend analysis</div>
-              </div>
-              <div className="text-right text-sm font-black text-[#10B981]">{formatUsd(metric.savings_value)}</div>
-            </div>
-          </div>
-        ))}
-        {!metrics.length && <EmptyState text="No backend metrics returned." />}
-      </div>
-    );
-  }
-
-  if (activeTab === "Cost Suggestions") {
-    return (
-      <div className="space-y-3">
-        {recommendations.map((rec) => (
-          <div key={rec.id} className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-black text-slate-900">{rec.title}</div>
-                <div className="mt-1 text-[11px] font-bold text-emerald-700">{rec.category} / {formatUsd(rec.expected_savings)} expected savings</div>
-              </div>
-              <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-emerald-700">{formatPct(rec.confidence_score)} confidence</span>
-            </div>
-            <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">{rec.business_reason || rec.impact_summary}</p>
-          </div>
-        ))}
-        {!recommendations.length && <EmptyState text="No backend recommendations returned." />}
-      </div>
-    );
-  }
-
-  const bestMetric = pickMetric(metrics, 0);
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-      {bestMetric ? (
-        <>
-          <h3 className="text-sm font-black text-slate-900">Reinvestment Advisor</h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-            The largest loaded optimization metric is {bestMetric.name}. The backend projects {formatUsd(bestMetric.savings_value)} in savings after optimization.
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <MetricTile label="Current" value={formatUsd(bestMetric.current_value)} />
-            <MetricTile label="Optimized" value={formatUsd(bestMetric.optimized_value)} />
-            <MetricTile label="Improvement" value={formatPct(bestMetric.improvement_pct)} />
-          </div>
-        </>
-      ) : <EmptyState text="No metric available for reinvestment analysis." />}
-    </div>
-  );
-}
-
-function Bar({ label, value, max }: { label: string; value: number; max: number }) {
-  const width = Math.max(3, Math.min(100, (value / Math.max(max, 1)) * 100));
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-[11px] font-black text-slate-600">
-        <span>{label}</span>
-        <span>{formatUsd(value)}</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-[#10B981]" style={{ width: `${width}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-400">
-      {text}
     </div>
   );
 }

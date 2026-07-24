@@ -100,7 +100,7 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white/80 backdrop-blur-2xl border-l border-white/50 w-[360px] shadow-[0_0_50px_rgba(0,0,0,0.1)] font-sans text-xs select-none">
+    <div className="h-full flex flex-col bg-white/80 backdrop-blur-2xl border-l border-white/50 w-full shadow-[0_0_50px_rgba(0,0,0,0.1)] font-sans text-xs select-none">
 
       {/* Panel Header */}
       <div className="p-5 border-b border-slate-200/60 flex items-center justify-between bg-gradient-to-br from-white/90 to-slate-50/90 relative overflow-hidden">

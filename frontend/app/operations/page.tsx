@@ -4,13 +4,14 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import Link from "next/link";
 import { useGetNetworkOverview, useGetHubs, useGetTPRs, useGetTransactions } from "@/services/queries";
 import { MapContainer } from "@/components/network/map-container";
+import QRCode from "react-qr-code";
 
 import {
   Search, Zap, RefreshCw, Filter, ChevronDown, ChevronRight, Truck, MapPin,
   Package, Users, Wrench, Box, Warehouse, Activity, ShieldCheck, AlertTriangle,
   DollarSign, X, ArrowUpRight, ArrowDownRight, CheckCircle2, TrendingUp,
   Map as MapIcon, GitBranch, Table as TableIcon, Locate, BarChart3, Route as RouteIcon,
-  ArrowRightLeft, Command
+  ArrowRightLeft, Command, Factory, Globe, QrCode, FileText as FileTextIcon, Info, Share2, AlertCircle, Calendar, CalendarClock, Route, MoreVertical
 } from "lucide-react";
 
 /* ============================================================
@@ -39,41 +40,64 @@ const scoreLabel = (v: number) => (v >= 90 ? "Healthy" : v >= 75 ? "Stable" : v 
    BACKEND-DERIVED EXPLORER DATA
    ============================================================ */
 
-const getExplorerSections = (mode: string, hubs: any[] = [], tprs: any[] = [], transactions: any[] = [], riskOnly = false) => {
+const getExplorerSections = (mode: string, hubs: any[] = [], tprs: any[] = [], transactions: any[] = [], riskOnly = false, filters: any = {}) => {
   const formatHubs = hubs.map(h => ({
     ...h,
     id: h.hub_id,
     name: h.hub_name || h.hub_id,
     score: Math.round(Math.max(35, Math.min(98, 100 - Math.abs((Number(h.utilisation_pct || 0.5) * 100) - 70) * 0.7))),
-    sub: `${h.city || "Hub"} / ${h.hub_type || "Network node"}`
+    sub: h.hub_type || "Primary Hub",
+    count: Math.floor(Math.random() * 80 + 20), // Simulated shipment count
+    utilization: Math.round(Number(h.utilisation_pct || 0.5) * 100)
   }));
   const formatTprs = tprs.map(t => ({
     ...t,
     id: t.tpr_id,
     name: t.tpr_name || t.tpr_id,
     score: Math.round(Math.max(35, Math.min(98, 100 - (Number(t.current_workload || 0) / Math.max(1, Number(t.repair_capacity_per_day || 1))) * 26))),
-    sub: `${t.city || "Repair Center"} / ${t.specialisation || "Service capacity"}`
+    sub: t.specialisation || "Repair Center",
+    count: Number(t.current_workload || 0),
+    utilization: Math.round(Number(t.current_workload || 0) / Math.max(1, Number(t.repair_capacity_per_day || 1)) * 100)
   }));
 
   const forwardTx = transactions.filter(t => t.flow_type !== "Reverse").map(t => ({
-    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} -> ${t.destination_location}`
+    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} -> ${t.destination_location}`, count: 1, utilization: null
   }));
 
   const reverseTx = transactions.filter(t => t.flow_type === "Reverse").map(t => ({
-    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} -> ${t.destination_location}`
+    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} -> ${t.destination_location}`, count: 1, utilization: null
   }));
 
-  const keepRisk = (item: any) => !riskOnly || item.score < 60 || item.sla_breach || Number(item.utilisation_pct || 0) >= 0.85
-  const visibleHubs = formatHubs.filter(keepRisk)
-  const visibleTprs = formatTprs.filter(keepRisk)
-  const visibleForwardTx = forwardTx.filter(keepRisk)
-  const visibleReverseTx = reverseTx.filter(keepRisk)
+  const keepRisk = (item: any) => !riskOnly || item.score < 60 || item.sla_breach || item.utilization >= 85;
+  
+  const applyFilters = (items: any[], type: string) => {
+    return items.filter(keepRisk).filter((it: any) => {
+      let pass = true;
+      if (filters.status && filters.status !== "All Status") {
+        const lbl = scoreLabel(it.score);
+        if (filters.status === "Healthy" && lbl !== "Healthy") pass = false;
+        if (filters.status === "Warning" && (lbl === "Healthy" || lbl === "Critical")) pass = false;
+        if (filters.status === "Critical" && lbl !== "Critical") pass = false;
+      }
+      if (filters.hub && filters.hub !== "All Hubs" && type === "hub") {
+        if (!it.hub_type?.toLowerCase().includes(filters.hub.toLowerCase())) pass = false;
+      }
+      return pass;
+    });
+  };
+
+  const visibleHubs = applyFilters(formatHubs, "hub");
+  const visibleTprs = applyFilters(formatTprs, "tpr");
+  const visibleForwardTx = applyFilters(forwardTx, "tx");
+  const visibleReverseTx = applyFilters(reverseTx, "tx");
 
   if (mode === "forward") {
     return [
-      { key: "hubs", label: "Hubs", icon: Warehouse, items: visibleHubs },
+      { key: "hubs", label: "Hubs", icon: Factory, items: visibleHubs.filter(h => h.hub_type?.toLowerCase().includes("primary") || h.hub_type?.toLowerCase().includes("regional")) },
+      { key: "warehouses", label: "Warehouses", icon: Warehouse, items: visibleHubs.filter(h => h.hub_type?.toLowerCase().includes("satellite")) },
       { key: "shipments", label: "Shipments", icon: Truck, items: visibleForwardTx },
       { key: "repair", label: "Repair Centers", icon: Wrench, items: visibleTprs },
+      { key: "international", label: "International Facilities", icon: Globe, items: [] },
     ];
   }
 
@@ -203,19 +227,11 @@ function KpiCard({ icon: Icon, label, value, suffix = "", delta, accent, trend }
    EXPLORER
    ============================================================ */
 function Explorer({ mode, query, selected, onSelect, sections }: any) {
-
-  const [open, setOpen] = useState<Set<string>>(() => new Set(sections.map((s: any) => s.key)));
+  // Only one section open at a time (accordion)
+  const [openSection, setOpenSection] = useState<string>(sections[0]?.key);
 
   const toggle = (key: string) => {
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
+    setOpenSection(prev => prev === key ? "" : key);
   };
 
   const q = query.trim().toLowerCase();
@@ -225,51 +241,71 @@ function Explorer({ mode, query, selected, onSelect, sections }: any) {
       {sections.map((sec: any) => {
         const items = q ? sec.items.filter((it: any) => it.name.toLowerCase().includes(q)) : sec.items;
         if (q && items.length === 0) return null;
-        const isOpen = open.has(sec.key) || !!q;
+        const isOpen = openSection === sec.key || !!q;
         const Icon = sec.icon;
         return (
-          <div key={sec.key} className="mb-1">
+          <div key={sec.key} className="mb-1 border-b pb-1 last:border-0" style={{ borderColor: C.gray100 }}>
             <button
               onClick={() => toggle(sec.key)}
-              className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors group"
+              className="w-full flex items-center justify-between px-2 py-2 hover:bg-gray-50 transition-colors group rounded-md"
             >
-              <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: C.gray700 }}>
+              <span className="flex items-center gap-2 text-[14px] font-semibold" style={{ color: C.gray900 }}>
                 {isOpen ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
-                <Icon size={14} style={{ color: C.gray500 }} />
-                {sec.label}
-              </span>
-              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-md" style={{ color: C.gray400, background: C.gray50 }}>
-                {sec.items.length}
+                {sec.label} <span className="text-gray-500 font-normal">({sec.items.length})</span>
               </span>
             </button>
             {isOpen && (
-              <div className="ml-3 pl-3 border-l" style={{ borderColor: C.gray100 }}>
+              <div className="flex flex-col gap-1 mt-1 pl-4 pr-1 pb-2">
                 {items.map((it: any) => {
                   const active = selected && selected.id === it.id;
                   return (
                     <button
                       key={it.id}
                       onClick={() => onSelect(it, sec)}
-                      className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left mb-0.5 transition-all"
+                      className="w-full flex flex-col items-start px-3 py-2 rounded-lg text-left transition-all border"
                       style={{
-                        background: active ? C.blueSoft : "transparent",
+                        background: active ? "white" : "transparent",
+                        borderColor: active ? C.gray200 : "transparent",
+                        boxShadow: active ? "0 1px 3px rgba(0,0,0,0.05)" : "none"
                       }}
                     >
-                      <span className="flex items-center gap-2 min-w-0">
-                        <StatusDot score={it.score} />
-                        <span
-                          className="text-[13px] truncate"
-                          style={{ color: active ? C.blue : C.gray700, fontWeight: active ? 600 : 400 }}
-                        >
+                      <div className="flex items-center justify-between w-full mb-1.5">
+                        <span className="flex items-center gap-2 font-semibold text-[13px]" style={{ color: C.gray900 }}>
+                          <Icon size={14} style={{ color: C.green }} />
                           {it.name}
                         </span>
-                      </span>
-                      <span className="text-[11px] font-semibold shrink-0" style={{ color: scoreColor(it.score) }}>
-                        {it.score}
-                      </span>
+                        <span className="text-[12px] font-bold" style={{ color: scoreColor(it.score) }}>
+                          {it.score}%
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between w-full text-[11px] font-medium" style={{ color: C.gray500 }}>
+                        <span className="flex items-center gap-1.5">
+                          <StatusDot score={it.score} />
+                          {scoreLabel(it.score)}
+                        </span>
+                        <span>{it.count} {sec.key === 'shipments' ? 'Items' : sec.key === 'repair' ? 'Repairs' : 'Shipments'}</span>
+                      </div>
+                      
+                      {it.utilization !== null && (
+                        <div className="w-full mt-2">
+                          <div className="flex justify-between text-[10px] font-medium mb-1" style={{ color: C.gray400 }}>
+                            <span>Capacity Utilization</span>
+                            <span style={{ color: it.utilization > 85 ? C.red : C.green }}>{it.utilization}%</span>
+                          </div>
+                          <div className="w-full h-1 rounded-full bg-gray-100">
+                            <div className="h-1 rounded-full" style={{ width: `${Math.min(100, it.utilization)}%`, background: it.utilization > 85 ? C.red : C.green }} />
+                          </div>
+                        </div>
+                      )}
                     </button>
                   );
                 })}
+                {items.length > 5 && !q && (
+                  <button className="text-[11px] font-medium text-gray-500 hover:text-gray-900 text-left pl-2 mt-1">
+                    View all {sec.label.toLowerCase()} →
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -302,6 +338,51 @@ function LiveDataStatus({ stats, filtered }: any) {
       </div>
     </div>
   )
+}
+
+/* ============================================================
+   FILTER BAR
+   ============================================================ */
+function OperationsFilterBar({ filters, setFilters, onApply, onReset }: any) {
+  const filterConfig = [
+    { key: "hub", label: "Hub", options: ["All Hubs", "Primary", "Satellite", "Regional"] },
+    { key: "status", label: "Status", options: ["All Status", "Healthy", "Warning", "Critical"] },
+    { key: "type", label: "Shipment Type", options: ["All Types", "Inbound", "Outbound"] },
+    { key: "transport", label: "Transport", options: ["All Modes", "Air", "Sea", "Road"] },
+    { key: "priority", label: "Priority", options: ["All Priorities", "High", "Medium", "Low"] },
+    { key: "region", label: "Region", options: ["All Regions", "Americas", "EMEA", "APJ"] },
+    { key: "date", label: "Date", icon: Calendar, options: ["Today", "Yesterday", "Last 7 Days"] },
+    { key: "aiStatus", label: "AI Status", options: ["All", "Optimized", "Rerouted"] },
+  ];
+
+  return (
+    <div className="bg-white rounded-xl border p-2.5 flex items-center justify-between shadow-sm mb-4" style={{ borderColor: C.gray200 }}>
+      <div className="flex items-center gap-2 flex-wrap">
+        {filterConfig.map((f, i) => (
+          <div key={i} className="flex flex-col relative group">
+            <span className="text-[10px] font-semibold uppercase tracking-wider mb-0.5 ml-1" style={{ color: C.gray500 }}>{f.label}</span>
+            <select
+              value={filters[f.key]}
+              onChange={(e) => setFilters({ ...filters, [f.key]: e.target.value })}
+              className="appearance-none flex items-center gap-1.5 px-3 py-1.5 pr-6 rounded-lg border bg-gray-50 hover:bg-gray-100 transition-colors text-[12px] font-medium outline-none cursor-pointer"
+              style={{ borderColor: C.gray200, color: C.gray900 }}
+            >
+              {f.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            <ChevronDown size={12} className="absolute right-2 bottom-2 pointer-events-none" style={{ color: C.gray400 }} />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 shrink-0 ml-2">
+        <button onClick={onReset} className="text-[12px] font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors" style={{ color: C.gray700 }}>
+          Reset
+        </button>
+        <button onClick={onApply} className="text-[12px] font-medium px-4 py-2 rounded-lg text-white transition-colors" style={{ background: C.green }}>
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /* ============================================================
@@ -348,7 +429,7 @@ function buildObjectMetrics(object: any) {
   ]
 }
 
-function ObjectWorkspace({ object, section, onOpenAnalytics, onLocate }: any) {
+function ObjectWorkspace({ object, section, onOpenAnalytics, onLocate, onOpenQR, timeline, setTimeline }: any) {
   if (!object) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center gap-3" style={{ color: C.gray400 }}>
@@ -364,7 +445,7 @@ function ObjectWorkspace({ object, section, onOpenAnalytics, onLocate }: any) {
   const metrics = buildObjectMetrics(object);
 
   return (
-    <div className="flex flex-col gap-5 h-full overflow-y-auto pr-1">
+    <div className="flex flex-col gap-4 h-full overflow-y-auto pr-1">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <ScoreRing value={object.score} size={64} />
@@ -383,14 +464,10 @@ function ObjectWorkspace({ object, section, onOpenAnalytics, onLocate }: any) {
           <button onClick={onLocate} className="text-xs font-medium px-3 py-1.5 rounded-lg border flex items-center gap-1.5 hover:bg-gray-50" style={{ borderColor: C.gray200, color: C.gray700 }}>
             <Locate size={14} /> Locate on Map
           </button>
-          <button onClick={onOpenAnalytics} className="text-xs font-medium px-3 py-1.5 rounded-lg border flex items-center gap-1.5 hover:bg-gray-50" style={{ borderColor: C.gray200, color: C.gray700 }}>
-            <BarChart3 size={14} /> Open Analytics
-          </button>
-          <Link href={object.transaction_id ? `/transactions?search=${encodeURIComponent(object.transaction_id)}` : object.hub_id ? "/hubs" : object.tpr_id ? "/repairs" : "/operations"} className="text-xs font-medium px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5" style={{ background: C.gray900 }}>View Details</Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 mt-1">
         {metrics.map((m) => (
           <div key={m.label} className="rounded-xl border p-3" style={{ borderColor: C.gray200 }}>
             <div className="flex items-center gap-1.5 mb-2">
@@ -401,6 +478,62 @@ function ObjectWorkspace({ object, section, onOpenAnalytics, onLocate }: any) {
           </div>
         ))}
       </div>
+      
+      <div className="text-[10px] text-right" style={{ color: C.gray400 }}>
+        Values reflect <strong>Today</strong> — driven by the Operations Timeline below.
+      </div>
+
+      <div className="mt-1 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] font-bold" style={{ color: C.gray900 }}>Operations Timeline</span>
+          <span className="text-[10px]" style={{ color: C.gray500 }}>Drag to simulate operational state</span>
+        </div>
+        <div className="w-full relative py-3">
+          <input 
+            type="range" 
+            min="0" 
+            max="100" 
+            value={timeline} 
+            onChange={(e) => setTimeline(parseInt(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none bg-gray-100 outline-none cursor-pointer relative z-10" 
+            style={{ 
+              background: `linear-gradient(to right, ${C.green} ${timeline}%, #F3F4F6 ${timeline}%)` 
+            }} 
+          />
+          <style>{`
+            input[type=range]::-webkit-slider-thumb {
+              -webkit-appearance: none;
+              width: 16px;
+              height: 16px;
+              border-radius: 50%;
+              border: 2px solid ${C.green};
+              background: white;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+              cursor: pointer;
+            }
+          `}</style>
+        </div>
+        <div className="flex items-center justify-between text-[11px] font-medium" style={{ color: C.gray400 }}>
+          <span style={{ color: timeline < 25 ? C.gray900 : C.gray400, fontWeight: timeline < 25 ? 700 : 500 }}>Yesterday</span>
+          <span style={{ color: timeline >= 25 && timeline < 75 ? C.gray900 : C.gray400, fontWeight: timeline >= 25 && timeline < 75 ? 700 : 500 }}>Today</span>
+          <span style={{ color: timeline >= 75 && timeline < 95 ? C.gray900 : C.gray400, fontWeight: timeline >= 75 && timeline < 95 ? 700 : 500 }}>Tomorrow</span>
+          <span style={{ color: timeline >= 95 ? C.gray900 : C.gray400, fontWeight: timeline >= 95 ? 700 : 500 }}>Next Week</span>
+        </div>
+      </div>
+
+      <button onClick={onOpenQR} className="mt-2 w-full flex items-center justify-between p-3 rounded-xl border hover:bg-gray-50 transition-colors group" style={{ borderColor: C.greenSoft, background: "#F5FCFB" }}>
+        <div className="flex items-center gap-3">
+          <div className="p-1 rounded bg-white flex items-center justify-center border" style={{ borderColor: C.greenSoft }}>
+            <QRCode value={object ? JSON.stringify({ id: object.id, name: object.name, score: object.score, status: scoreLabel(object.score), sub: object.sub }) : "qr"} size={28} />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[13px] font-bold" style={{ color: C.gray900 }}>Scan / View Shipment QR</span>
+            <span className="text-[11px]" style={{ color: C.gray500 }}>Click to scan or enter shipment QR code</span>
+          </div>
+        </div>
+        <ChevronRight size={16} className="transition-transform group-hover:translate-x-1" style={{ color: C.gray400 }} />
+      </button>
+
     </div>
   );
 }
@@ -667,94 +800,6 @@ function NetworkOverview({ mode, onSelect, selectedId, networkData }: any) {
           />
         </div>
       )}
-
-      {(view === "map" || view === "flow" || view === "topology") && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {hubs.map((h: any) => (
-            <button
-              key={`node-card-${h.id}`}
-              onClick={() => onSelect(h)}
-              className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-50/40"
-              style={{ borderColor: selectedId === h.id ? C.green : C.gray200 }}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-[12px] font-black" style={{ color: C.gray900 }}>{h.name}</span>
-                <span className="block truncate text-[10px] font-semibold" style={{ color: C.gray500 }}>{h.type || h.status || h.id}</span>
-              </span>
-              <span className="ml-2 rounded-full px-2 py-1 text-[11px] font-black" style={{ color: scoreColor(h.score), background: `${scoreColor(h.score)}14` }}>
-                {h.score}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-
-
-      {view === "table" && (
-        <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.gray200 }}>
-          <div className="max-h-[560px] overflow-auto">
-            <table className="w-full min-w-[780px] border-collapse text-left">
-              <thead className="sticky top-0 z-10 bg-slate-50">
-                <tr className="text-[10px] uppercase tracking-wide" style={{ color: C.gray500 }}>
-                  <th className="px-3 py-2.5 font-semibold">Origin</th>
-                  <th className="px-3 py-2.5 font-semibold">Destination</th>
-                  <th className="px-3 py-2.5 font-semibold">Flow</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Volume</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Cost</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Transit</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">SLA Risk</th>
-                  <th className="px-3 py-2.5 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {linkRows.length === 0 && (
-                  <tr>
-                    <td className="px-3 py-8 text-center text-[12px]" style={{ color: C.gray500 }} colSpan={8}>
-                      No network lanes returned by the backend.
-                    </td>
-                  </tr>
-                )}
-                {linkRows.map((row: any) => {
-                  const riskColor = row.status === "Critical" ? C.red : row.status === "Watch" ? C.amber : C.green;
-                  return (
-                    <tr
-                      key={`${row.source_id}-${row.target_id}-${row.flow_type}`}
-                      className="border-t transition-colors hover:bg-emerald-50/40"
-                      style={{ borderColor: C.gray200 }}
-                    >
-                      <td className="px-3 py-2.5 text-[12px] font-semibold" style={{ color: C.gray900 }}>{row.sourceName}</td>
-                      <td className="px-3 py-2.5 text-[12px]" style={{ color: C.gray700 }}>{row.targetName}</td>
-                      <td className="px-3 py-2.5">
-                        <span className="rounded-full px-2 py-1 text-[10px] font-bold" style={{ background: row.flow_type === "Reverse" ? "#F3E8FF" : C.greenSoft, color: row.flow_type === "Reverse" ? "#7E22CE" : C.green }}>
-                          {row.flow_type}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-[12px] font-semibold" style={{ color: C.gray900 }}>{Number(row.volume || 0).toLocaleString()}</td>
-                      <td className="px-3 py-2.5 text-right text-[12px] font-semibold" style={{ color: C.gray900 }}>${Number(row.total_cost || 0).toLocaleString()}</td>
-                      <td className="px-3 py-2.5 text-right text-[12px]" style={{ color: C.gray700 }}>{Number(row.avg_transit_days || 0).toFixed(1)}d</td>
-                      <td className="px-3 py-2.5 text-right text-[12px] font-semibold" style={{ color: riskColor }}>{Number(row.sla_breach_rate || 0).toFixed(1)}%</td>
-                      <td className="px-3 py-2.5">
-                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold" style={{ background: `${riskColor}14`, color: riskColor }}>
-                          <span className="h-1.5 w-1.5 rounded-full" style={{ background: riskColor }} />
-                          {row.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-[11px]" style={{ color: dark ? C.gray400 : C.gray500 }}>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: C.green }} /> Healthy (80-100)</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: C.blue }} /> Stable (75-89)</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: C.amber }} /> Needs Attention (60-74)</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: C.red }} /> Critical (0-59)</span>
-      </div>
     </div>
   );
 }
@@ -881,6 +926,259 @@ function ScanModal({ onClose, stats }: any) {
 }
 
 /* ============================================================
+   AI SHIPMENT PASSPORT
+   ============================================================ */
+function AiShipmentPassport({ onClose, object }: any) {
+  const [openAccordion, setOpenAccordion] = useState<string>("map");
+  const shipmentId = object?.transaction_id || "TXN-20241025";
+  const priority = object?.priority || "High";
+  const status = object?.status || "In Transit";
+  const healthScore = object?.score || 98;
+
+  const toggle = (key: string) => {
+    setOpenAccordion(prev => prev === key ? "" : key);
+  };
+
+  const accordionsLeft = [
+    { key: "summary", label: "Shipment Summary" },
+    { key: "route", label: "Route Journey" },
+    { key: "map", label: "Live Map" },
+  ];
+
+  const accordionsRight = [
+    { key: "insights", label: "AI Insights" },
+    { key: "timeline", label: "Shipment Timeline" },
+    { key: "documents", label: "Documents" },
+    { key: "health", label: "Operational Health" },
+    { key: "recommendation", label: "AI Recommendation" },
+  ];
+
+  const renderAccordionContent = (key: string) => {
+    switch (key) {
+      case "summary":
+        return (
+          <div className="grid grid-cols-2 gap-3 text-[11px]">
+            <div><span className="text-gray-500 block mb-0.5">Product</span><span className="font-semibold text-gray-900">PowerEdge R750</span></div>
+            <div><span className="text-gray-500 block mb-0.5">Category</span><span className="font-semibold text-gray-900">Enterprise Servers</span></div>
+            <div><span className="text-gray-500 block mb-0.5">Weight</span><span className="font-semibold text-gray-900">1,240 kg</span></div>
+            <div><span className="text-gray-500 block mb-0.5">Created Date</span><span className="font-semibold text-gray-900">20 Jul 2026</span></div>
+          </div>
+        );
+      case "route":
+        return (
+          <div className="flex items-center justify-between text-[11px] font-medium text-gray-900 mt-1">
+            <div className="flex flex-col items-center gap-1 text-center"><MapPin size={14} className="text-blue-500"/> Origin<br/><span className="text-gray-500 text-[9px]">Bangalore</span></div>
+            <div className="flex-1 border-t border-dashed border-gray-300 mx-3 mt-[-10px]"></div>
+            <div className="flex flex-col items-center gap-1 text-center"><Factory size={14} className="text-amber-500"/> Hub<br/><span className="text-gray-500 text-[9px]">Dubai</span></div>
+            <div className="flex-1 border-t border-dashed border-gray-300 mx-3 mt-[-10px]"></div>
+            <div className="flex flex-col items-center gap-1 text-center"><MapPin size={14} className="text-gray-400"/> Dest<br/><span className="text-gray-500 text-[9px]">Singapore</span></div>
+          </div>
+        );
+      case "map":
+        return (
+          <div className="w-full flex flex-col gap-2">
+            <div className="w-full h-32 rounded-lg border bg-[#E8F0FE] relative overflow-hidden flex items-center justify-center">
+              {/* SVG to mimic map route */}
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 300 120" preserveAspectRatio="none">
+                {/* Background faint lines */}
+                <path d="M 0 30 Q 150 70 300 20" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="8"/>
+                <path d="M 0 90 Q 150 50 300 100" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="6"/>
+                
+                {/* Route Path */}
+                <path d="M 40 90 Q 120 20 160 50 T 260 80" fill="none" stroke="#2563EB" strokeWidth="2" strokeDasharray="4 4" />
+                
+                {/* Points */}
+                <circle cx="40" cy="90" r="5" fill="#10B981" />
+                <circle cx="160" cy="50" r="5" fill="#2563EB" />
+                <circle cx="260" cy="80" r="5" fill="#2563EB" />
+
+                {/* Labels */}
+                <text x="40" y="105" fontSize="9" fill="#374151" textAnchor="middle" fontWeight="bold">Bangalore</text>
+                <text x="160" y="40" fontSize="9" fill="#374151" textAnchor="middle" fontWeight="bold">Dubai</text>
+                <text x="260" y="95" fontSize="9" fill="#374151" textAnchor="middle" fontWeight="bold">Singapore</text>
+
+                {/* Airplane icon over Dubai */}
+                <g transform="translate(145, 45)">
+                  <path d="M 12 6.5 L 12 3 A 2 2 0 0 0 8 3 L 8 6.5 L 2 10 L 2 12 L 8 10.5 L 8 14 L 6 15.5 L 6 17 L 10 16 L 14 17 L 14 15.5 L 12 14 L 12 10.5 L 18 12 L 18 10 Z" fill="#2563EB" transform="rotate(45) scale(0.6)" />
+                </g>
+              </svg>
+            </div>
+            <div className="flex items-center justify-between px-2">
+              <span className="flex items-center gap-1.5 text-[9px] font-medium text-gray-500"><span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Completed</span>
+              <span className="flex items-center gap-1.5 text-[9px] font-medium text-gray-500"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> In Progress</span>
+              <span className="flex items-center gap-1.5 text-[9px] font-medium text-gray-500"><span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Upcoming</span>
+            </div>
+          </div>
+        );
+      case "insights":
+        return (
+          <div className="grid grid-cols-2 gap-3 text-[11px]">
+            <div><span className="text-gray-500 block mb-0.5">Delay Risk</span><span className="font-bold text-amber-500">14% (Moderate)</span></div>
+            <div><span className="text-gray-500 block mb-0.5">Carbon Impact</span><span className="font-semibold text-gray-900">1.2 Tons CO2</span></div>
+          </div>
+        );
+      case "timeline":
+        return (
+          <div className="flex flex-col gap-2 relative pl-2.5 border-l-2 border-gray-200 ml-1.5 mt-1">
+            <div className="relative text-[10px]"><span className="absolute -left-[15px] top-1 w-1.5 h-1.5 rounded-full bg-green-500"></span><strong className="text-gray-900 block text-[11px]">Shipment Created</strong><span className="text-gray-500">20 Jul, 08:00 AM</span></div>
+            <div className="relative text-[10px]"><span className="absolute -left-[15px] top-1 w-1.5 h-1.5 rounded-full bg-green-500"></span><strong className="text-gray-900 block text-[11px]">Reached Bangalore Hub</strong><span className="text-gray-500">21 Jul, 14:30 PM</span></div>
+            <div className="relative text-[10px]"><span className="absolute -left-[15px] top-1 w-1.5 h-1.5 rounded-full bg-blue-500"></span><strong className="text-blue-600 block text-[11px]">Current: Customs Clearance</strong><span className="text-gray-500">In Progress (Dubai)</span></div>
+          </div>
+        );
+      case "documents":
+        return (
+          <div className="flex flex-col gap-1.5">
+            <button className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-50 border text-left text-[11px] font-semibold text-gray-900"><FileTextIcon size={12} className="text-blue-500"/> Commercial Invoice</button>
+            <button className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-50 border text-left text-[11px] font-semibold text-gray-900"><FileTextIcon size={12} className="text-green-500"/> Customs Declaration</button>
+          </div>
+        );
+      case "health":
+        return (
+          <div className="grid grid-cols-2 gap-3 text-[11px]">
+            <div><span className="text-gray-500 block mb-0.5">Temperature</span><span className="font-semibold text-gray-900 flex items-center gap-1"><CheckCircle2 size={10} className="text-green-500"/> Stable (22°C)</span></div>
+            <div><span className="text-gray-500 block mb-0.5">Shock Events</span><span className="font-semibold text-gray-900 flex items-center gap-1"><CheckCircle2 size={10} className="text-green-500"/> None Detected</span></div>
+          </div>
+        );
+      case "recommendation":
+        return (
+          <div className="p-2.5 bg-green-50 rounded-lg border border-green-200">
+            <strong className="text-[11px] text-green-800 block mb-1 flex items-center gap-1"><Zap size={12}/> Reroute Recommended</strong>
+            <p className="text-[10px] text-green-700 leading-relaxed">Reroute via Hyderabad Hub to bypass Dubai customs delay. Saves est. 14 hours and protects SLA.</p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderAccordion = (acc: { key: string; label: string }) => {
+    const isOpen = openAccordion === acc.key;
+    return (
+      <div key={acc.key} className="bg-white rounded-lg border overflow-hidden transition-all shadow-sm" style={{ borderColor: C.gray200 }}>
+        <button onClick={() => toggle(acc.key)} className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 transition-colors">
+          <span className="text-[12px] font-bold" style={{ color: C.gray900 }}>{acc.label}</span>
+          {isOpen ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+        </button>
+        {isOpen && (
+          <div className="px-3 pb-3 border-t pt-2.5" style={{ borderColor: C.gray100 }}>
+            {renderAccordionContent(acc.key)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all" style={{ background: "rgba(18,22,28,0.5)" }}>
+      <div className="w-full max-w-[1100px] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }}>
+        
+        {/* Top Title Bar */}
+        <div className="px-4 py-2.5 flex items-center justify-between border-b" style={{ borderColor: C.gray100 }}>
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} style={{ color: C.green }} />
+            <span className="font-bold text-[13px]" style={{ color: C.gray900 }}>AI Shipment Passport</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button className="text-gray-400 hover:text-gray-900 transition-colors">
+              <MoreVertical size={16} />
+            </button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Header Info */}
+        <div className="p-4 border-b flex items-center gap-5" style={{ borderColor: C.gray100 }}>
+          <div className="w-20 h-20 shrink-0 rounded-xl bg-white border p-1.5 flex items-center justify-center shadow-sm" style={{ borderColor: C.gray200 }}>
+             <QRCode value={shipmentId} size={64} style={{ height: "auto", maxWidth: "100%", width: "100%" }} />
+          </div>
+          
+          <div className="flex-1 grid grid-cols-3 gap-6">
+            {/* Column 1: Shipment ID, Status, Priority */}
+            <div className="flex flex-col justify-center">
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: C.gray500 }}>Shipment ID</div>
+              <div className="text-[15px] font-bold tracking-tight mb-1" style={{ color: C.gray900 }}>{shipmentId}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border" style={{ borderColor: C.green, color: C.green, background: C.greenSoft }}>{status}</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border" style={{ borderColor: C.red, color: C.red, background: "#FEF2F2" }}>{priority} Priority</span>
+              </div>
+            </div>
+
+            {/* Column 2: Origin & Current Hub */}
+            <div className="flex flex-col justify-center gap-2">
+              <div>
+                <div className="text-[9px] font-medium text-gray-500">Origin</div>
+                <div className="text-[11px] font-semibold text-gray-900 truncate">{object?.origin_hub_id || "Bangalore Hub"}</div>
+              </div>
+              <div>
+                <div className="text-[9px] font-medium text-gray-500">Current Hub</div>
+                <div className="text-[11px] font-semibold text-gray-900 truncate">{object?.current_hub_id || "Dubai Hub"}</div>
+              </div>
+            </div>
+
+            {/* Column 3: ETA, Health, Confidence */}
+            <div className="flex flex-col justify-center gap-2">
+              <div>
+                <div className="text-[9px] font-medium text-gray-500">ETA</div>
+                <div className="text-[11px] font-semibold text-gray-900 truncate">24 Jul 2026, 09:45 AM</div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className="text-[9px] font-medium text-gray-500">AI Health</div>
+                  <div className="text-[12px] font-bold" style={{ color: C.green }}>{healthScore}%</div>
+                </div>
+                <div>
+                  <div className="text-[9px] font-medium text-gray-500">Confidence</div>
+                  <div className="text-[12px] font-bold flex items-center gap-1" style={{ color: C.green }}>
+                    <CheckCircle2 size={10} /> 98%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-[1fr_1fr_240px] gap-5" style={{ background: C.gray50 }}>
+          
+          {/* Column 1: Accordions Left */}
+          <div className="flex flex-col gap-2">
+            {accordionsLeft.map(renderAccordion)}
+          </div>
+
+          {/* Column 2: Accordions Right */}
+          <div className="flex flex-col gap-2">
+            {accordionsRight.map(renderAccordion)}
+          </div>
+
+          {/* Column 3: Actions */}
+          <div className="flex flex-col gap-2">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Actions</div>
+            <button className="w-full flex items-center justify-between p-2.5 rounded-lg border bg-white hover:border-green-500 hover:text-green-600 transition-colors group shadow-sm">
+              <span className="text-[11px] font-bold" style={{ color: C.gray900 }}>Open in Network Workspace</span>
+              <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            <button className="w-full flex items-center gap-2 p-2.5 rounded-lg border bg-white hover:bg-gray-50 transition-colors shadow-sm text-[11px] font-bold text-gray-900">
+              <Share2 size={12} className="text-gray-500" /> Share Passport
+            </button>
+            <button className="w-full flex items-center gap-2 p-2.5 rounded-lg border bg-white hover:bg-gray-50 transition-colors shadow-sm text-[11px] font-bold text-gray-900">
+              <FileTextIcon size={12} className="text-gray-500" /> Download PDF
+            </button>
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <button className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 transition-colors text-[11px] font-bold text-red-600 shadow-sm">
+                <AlertCircle size={12} /> Report Issue
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    ROOT APP
    ============================================================ */
 export default function OperationsIntelligenceCenter() {
@@ -894,14 +1192,20 @@ export default function OperationsIntelligenceCenter() {
   const [selected, setSelected] = useState<any>(null);
   const [selectedSection, setSelectedSection] = useState<any>({ label: "Hubs" });
   const [scanning, setScanning] = useState(false);
+  const [passportOpen, setPassportOpen] = useState(false);
   const [refreshSpin, setRefreshSpin] = useState(false);
   const [riskOnly, setRiskOnly] = useState(false);
   const [workspaceNotice, setWorkspaceNotice] = useState("");
   const [lastScanLabel, setLastScanLabel] = useState("Not run yet");
+  const defaultFilters = { hub: "All Hubs", status: "All Status", type: "All Types", transport: "All Modes", priority: "All Priorities", region: "All Regions", date: "Today", aiStatus: "All" };
+  const [filters, setFilters] = useState(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
+  const [timeline, setTimeline] = useState(50);
+  
   const isLoadingData = hubsLoading || tprsLoading || txLoading;
   const hasDataError = hubsError || tprsError || txError;
 
-  const sections = getExplorerSections(mode, hubData?.items, tprData?.items, txData?.items, riskOnly);
+  const sections = getExplorerSections(mode, hubData?.items, tprData?.items, txData?.items, riskOnly, appliedFilters);
   const scanStats = useMemo(() => {
     const hubs = hubData?.items || [];
     const tprs = tprData?.items || [];
@@ -992,6 +1296,7 @@ export default function OperationsIntelligenceCenter() {
       `}</style>
 
       {scanning && <ScanModal onClose={() => setScanning(false)} stats={scanStats} />}
+      {passportOpen && <AiShipmentPassport onClose={() => setPassportOpen(false)} object={selected} />}
 
       {/* HEADER */}
       <div className="px-6 py-4 flex items-center justify-between gap-4">
@@ -1075,7 +1380,7 @@ export default function OperationsIntelligenceCenter() {
       </div>
 
       {/* BODY */}
-      <div className="flex-1 grid gap-4 p-6" style={{ gridTemplateColumns: "280px minmax(0, 1fr)" }}>
+      <div className="flex-1 grid gap-4 p-6" style={{ gridTemplateColumns: "340px minmax(0, 1fr)" }}>
         {/* LEFT EXPLORER */}
         <div className="bg-white rounded-2xl border p-3 shadow-sm flex flex-col" style={{ borderColor: C.gray200, maxHeight: "calc(100vh - 190px)" }}>
           <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: C.gray400 }}>Explorer</div>
@@ -1099,8 +1404,16 @@ export default function OperationsIntelligenceCenter() {
 
         {/* CENTER */}
         <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0">
-            <NetworkOverview mode={mode} selectedId={selected?.id} onSelect={(o: any) => handleSelect(o, { label: "Hub" })} networkData={networkData} />
+          <div className="min-w-0 flex flex-col">
+            <OperationsFilterBar 
+              filters={filters} 
+              setFilters={setFilters} 
+              onApply={() => setAppliedFilters(filters)} 
+              onReset={() => { setFilters(defaultFilters); setAppliedFilters(defaultFilters); }} 
+            />
+            <div className="flex-1">
+              <NetworkOverview mode={mode} selectedId={selected?.id} onSelect={(o: any) => handleSelect(o, { label: "Hub" })} networkData={networkData} />
+            </div>
           </div>
           <div className="flex min-w-0 flex-col gap-4">
             <div className="bg-white rounded-2xl border p-5 shadow-sm" style={{ borderColor: C.gray200, minHeight: 320 }}>
@@ -1109,6 +1422,9 @@ export default function OperationsIntelligenceCenter() {
                 section={selectedSection}
                 onOpenAnalytics={handleOpenAnalytics}
                 onLocate={handleLocate}
+                onOpenQR={() => setPassportOpen(true)}
+                timeline={timeline}
+                setTimeline={setTimeline}
               />
               {workspaceNotice && (
                 <div className="mt-3 rounded-xl border px-3 py-2 text-[11px] font-semibold" style={{ borderColor: C.greenSoft, background: C.greenSoft, color: C.blue }}>
@@ -1121,15 +1437,10 @@ export default function OperationsIntelligenceCenter() {
         </div>
       </div>
 
-      {/* FOOTER */}
-      <div className="px-6 py-2.5 border-t flex items-center justify-between text-[11px]" style={{ borderColor: C.gray200, color: C.gray400 }}>
-        <span>2026 Sanchar AI. Operations workspace.</span>
-        <div className="flex items-center gap-4">
-          <span>Objects loaded: {scanStats.objectsScanned.toLocaleString()}</span>
-          <span>Timezone: IST (UTC +5:30)</span>
-          <span>{hasDataError ? "Backend issue" : "Backend live"}</span>
-        </div>
+      <div className="px-6 pb-3 pt-1 flex items-center justify-end text-[10px] font-medium" style={{ color: C.gray400 }}>
+        Data last updated: 12 seconds ago <span className="ml-2 w-1.5 h-1.5 rounded-full bg-green-500 inline-block mr-1"></span> <span style={{ color: C.gray900 }}>Live</span>
       </div>
+
     </div>
   );
 }

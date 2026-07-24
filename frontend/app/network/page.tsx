@@ -6,6 +6,7 @@ import {
   MapPin, 
   ChevronRight,
   ChevronDown,
+  Wrench,
   Truck,
   Box,
   AlertTriangle,
@@ -18,6 +19,11 @@ import {
   Play,
   Pause,
   CheckCircle,
+  Plane,
+  Ship,
+  Train,
+  Building2,
+  Globe,
 } from "lucide-react"
 
 import { useGetNetworkOverview } from "@/services/queries"
@@ -75,7 +81,7 @@ export default function MapOverviewPage() {
   const [activeTab, setActiveTab] = useState<"layers" | "shipments">("layers")
 
   // Sidebar toggles
-  const [expandedSection, setExpandedSection] = useState<string>("Hub Types")
+  const [expandedSection, setExpandedSection] = useState<string>("Hubs")
   
   // Layer state to filter map
   const [layerState, setLayerState] = useState<any>({
@@ -98,6 +104,8 @@ export default function MapOverviewPage() {
   const [health, setHealth] = useState<TwinHealth | null>(null)
   const [twinError, setTwinError] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(true)
+  const [isTabVisible, setIsTabVisible] = useState(true)
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
 
   // Expand animation state for the panel
   const [panelReady, setPanelReady] = useState(false)
@@ -137,6 +145,33 @@ export default function MapOverviewPage() {
     loadTwinData()
   }, [loadTwinData])
 
+  useEffect(() => {
+    const updateVisibility = () => setIsTabVisible(document.visibilityState === "visible")
+    updateVisibility()
+    document.addEventListener("visibilitychange", updateVisibility)
+    return () => document.removeEventListener("visibilitychange", updateVisibility)
+  }, [])
+
+  // Playback timeline animation loop
+  useEffect(() => {
+    if (!isPlaying || !isTabVisible) return
+
+    const interval = setInterval(() => {
+      setShipments(prev =>
+        prev.map(s => {
+          let nextProg = s.progress + (1.5 * playbackSpeed)
+          if (nextProg >= 100) nextProg = 0 // reset loop
+          return {
+            ...s,
+            progress: parseFloat(nextProg.toFixed(1))
+          }
+        })
+      )
+    }, 800)
+
+    return () => clearInterval(interval)
+  }, [isPlaying, isTabVisible, playbackSpeed])
+
   const toggleLayer = (category: string, key: string) => {
     setLayerState((prev: any) => ({
       ...prev,
@@ -147,13 +182,11 @@ export default function MapOverviewPage() {
     }))
   }
 
-  const trackedShipments = isPlaying ? shipments : []
-
   const { projectedNodes, projectedLinks } = useMemo(() => {
     const nodes: NetworkNode[] = (network?.nodes || []).map(n => ({ ...n }))
     const links: NetworkLink[] = (network?.links || []).map(l => ({ ...l }))
 
-    trackedShipments.forEach(s => {
+    shipments.forEach(s => {
       let srcNode = nodes.find(n => n.id === s.origin || n.city === s.origin || n.name === s.origin)
       let dstNode = nodes.find(n => n.id === s.destination || n.city === s.destination || n.name === s.destination)
 
@@ -221,62 +254,52 @@ export default function MapOverviewPage() {
     })
 
     return { projectedNodes: nodes, projectedLinks: links }
-  }, [network?.links, network?.nodes, trackedShipments])
+  }, [network?.links, network?.nodes, shipments])
 
   const sections = [
     {
       id: "Hub Types",
       icon: MapPin,
       items: [
-        { key: "primary", label: "Primary Hubs", cat: "network" },
-        { key: "regional", label: "Regional Hubs", cat: "network" },
-        { key: "satellite", label: "Satellite Hubs", cat: "network" },
-        { key: "international", label: "International Hubs", cat: "network" },
-        { key: "repair", label: "Repair Centers", cat: "network" }
+        { key: "primary", label: "Primary Hubs", cat: "network", icon: Building2 },
+        { key: "regional", label: "Regional Hubs", cat: "network", icon: Building2 },
+        { key: "satellite", label: "Satellite Hubs", cat: "network", icon: Box },
+        { key: "international", label: "International Hubs", cat: "network", icon: Globe },
+        { key: "repair", label: "Repair Centers", cat: "network", icon: Wrench }
       ]
     },
     {
       id: "Shipment Types",
       icon: Truck,
       items: [
-        { key: "road", label: "Road Shipment", cat: "shipments" },
-        { key: "air", label: "Air Shipment", cat: "shipments" },
-        { key: "sea", label: "Sea Shipment", cat: "shipments" },
-        { key: "rail", label: "Rail Shipment", cat: "shipments" }
+        { key: "road", label: "Road Shipment", cat: "shipments", icon: Truck },
+        { key: "air", label: "Air Shipment", cat: "shipments", icon: Plane },
+        { key: "sea", label: "Sea Shipment", cat: "shipments", icon: Ship },
+        { key: "rail", label: "Rail Shipment", cat: "shipments", icon: Train }
       ]
     },
     {
       id: "Route Types",
       icon: Zap,
       items: [
-        { key: "normal", label: "Normal Route", cat: "routes" },
-        { key: "aiRecommended", label: "AI Recommended", cat: "routes" }
+        { key: "normal", label: "Normal Route", cat: "routes", icon: Zap },
+        { key: "aiRecommended", label: "AI Recommended", cat: "routes", icon: BrainCircuit }
       ]
     },
     {
       id: "AI Vision Layers",
       icon: BrainCircuit,
       items: [
-        { key: "xrayMode", label: "AI Vision Mode", cat: "ai" }
+        { key: "xrayMode", label: "AI Vision Mode", cat: "ai", icon: BrainCircuit }
       ]
     },
     {
       id: "Traffic & Congestion",
       icon: AlertTriangle,
       items: [
-        { key: "health", label: "Healthy Route", cat: "traffic" },
-        { key: "moderate", label: "Moderate Congestion", cat: "traffic" },
-        { key: "heavy", label: "Heavy Congestion", cat: "traffic" }
-      ]
-    },
-    {
-      id: "Risk Layers",
-      icon: Activity,
-      items: [
-        { key: "cost", label: "Cost Exposure", cat: "risk" },
-        { key: "inventory", label: "Inventory Pressure", cat: "risk" },
-        { key: "sla", label: "SLA Breach Risk", cat: "risk" },
-        { key: "congestion", label: "Hub Congestion", cat: "risk" }
+        { key: "health", label: "Healthy Route", cat: "traffic", icon: CheckCircle },
+        { key: "moderate", label: "Moderate Congestion", cat: "traffic", icon: AlertTriangle },
+        { key: "heavy", label: "Heavy Congestion", cat: "traffic", icon: AlertTriangle }
       ]
     },
     {
@@ -284,23 +307,6 @@ export default function MapOverviewPage() {
       icon: Layers,
       items: []
     }
-  ]
-
-  const legendItems = [
-    { label: "Primary Hub", enabled: layerState.network?.primary, marker: <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> },
-    { label: "Regional Hub", enabled: layerState.network?.regional, marker: <span className="h-2.5 w-2.5 rounded-sm bg-emerald-400" /> },
-    { label: "Satellite Hub", enabled: layerState.network?.satellite, marker: <Box className="h-3.5 w-3.5 text-slate-500" /> },
-    { label: "International Hub", enabled: layerState.network?.international, marker: <span className="h-2.5 w-2.5 rounded-full bg-slate-900" /> },
-    { label: "Repair Center", enabled: layerState.network?.repair, marker: <span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> },
-    { label: "Road Shipment", enabled: layerState.shipments?.road, marker: <Truck className="h-3.5 w-3.5 text-emerald-600" /> },
-    { label: "Air Shipment", enabled: layerState.shipments?.air, marker: <span className="h-0.5 w-4 rounded bg-blue-500" /> },
-    { label: "Sea Shipment", enabled: layerState.shipments?.sea, marker: <span className="h-0.5 w-4 rounded bg-cyan-500" /> },
-    { label: "Rail Shipment", enabled: layerState.shipments?.rail, marker: <span className="h-0.5 w-4 rounded bg-slate-600" /> },
-    { label: "Healthy Route", enabled: layerState.traffic?.health, marker: <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> },
-    { label: "Moderate Congestion", enabled: layerState.traffic?.moderate, marker: <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> },
-    { label: "Heavy Congestion", enabled: layerState.traffic?.heavy, marker: <span className="h-2.5 w-2.5 rounded-full bg-red-600" /> },
-    { label: "AI Recommended Route", enabled: layerState.routes?.aiRecommended, marker: <span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> },
-    { label: "Predicted SLA Risk", enabled: layerState.ai?.xrayMode, marker: <AlertTriangle className="h-3.5 w-3.5 text-red-600" /> },
   ]
 
   const activeMapLayer = layerState.ai.xrayMode
@@ -391,24 +397,30 @@ export default function MapOverviewPage() {
             </div>
           )}
 
-          {/* Backend tracking controls */}
+          {/* Playback controls (Always visible in Header) */}
           <div className="flex items-center justify-between bg-slate-50 border border-slate-200/60 p-2 rounded-xl text-[10px] font-bold text-slate-600">
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setIsPlaying(prev => !prev)} 
                 className="p-1.5 rounded-lg bg-white shadow-sm border border-slate-200/40 hover:bg-slate-50 transition-colors"
-                title={isPlaying ? "Hide Tracking" : "Show Tracking"}
+                title={isPlaying ? "Pause Tracking" : "Play Tracking"}
               >
-                {isPlaying ? <Pause className="h-3.5 w-3.5 text-rose-500" /> : <Play className="h-3.5 w-3.5 text-emerald-500" />}
+                {isPlaying ? <Pause className="h-3.5 w-3.5 text-rose-500" /> : <Play className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />}
               </button>
-              <span className="text-slate-400 font-extrabold text-[8px] uppercase tracking-wider">Backend Shipment Tracking</span>
+              <span className="text-slate-400 font-extrabold text-[8px] uppercase tracking-wider">Network Replay:</span>
             </div>
-            <button
-              onClick={loadTwinData}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-600 shadow-sm hover:bg-slate-50"
-            >
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="0.5"
+                max="3.0"
+                step="0.5"
+                value={playbackSpeed}
+                onChange={e => setPlaybackSpeed(parseFloat(e.target.value))}
+                className="w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#00C853]"
+              />
+              <span className="font-mono text-[9px] w-8 text-right bg-white border border-slate-200/50 px-1 py-0.5 rounded shadow-sm">{playbackSpeed.toFixed(1)}x</span>
+            </div>
           </div>
 
           {/* Workspace Tabs */}
@@ -458,12 +470,48 @@ export default function MapOverviewPage() {
                     <div className="px-3 pb-3 space-y-1.5 pt-2">
                       {sec.id === "Network Legend" ? (
                         <div className="space-y-2 text-[11px] font-semibold text-slate-700 pl-1">
-                          {legendItems.map((item) => (
-                            <div key={item.label} className={`flex items-center gap-2 transition-opacity ${item.enabled ? "" : "opacity-30"}`}>
-                              {item.marker}
-                              <span>{item.label}</span>
-                            </div>
-                          ))}
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.network?.primary ? '' : 'opacity-30'}`}>
+                            <span>🟢</span> Primary Hub
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.network?.regional ? '' : 'opacity-30'}`}>
+                            <span>🟩</span> Regional Hub
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.network?.satellite ? '' : 'opacity-30'}`}>
+                            <span>📦</span> Satellite Hub
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.network?.international ? '' : 'opacity-30'}`}>
+                            <span>🌍</span> International Hub
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.network?.repair ? '' : 'opacity-30'}`}>
+                            <span>🔧</span> Repair Center
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.shipments?.road ? '' : 'opacity-30'}`}>
+                            <span>🚚</span> Road Shipment
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.shipments?.air ? '' : 'opacity-30'}`}>
+                            <span>✈</span> Air Shipment
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.shipments?.sea ? '' : 'opacity-30'}`}>
+                            <span>🚢</span> Sea Shipment
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.shipments?.rail ? '' : 'opacity-30'}`}>
+                            <span>🚂</span> Rail Shipment
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.traffic?.health ? '' : 'opacity-30'}`}>
+                            <span>🟢</span> Healthy Route
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.traffic?.moderate ? '' : 'opacity-30'}`}>
+                            <span>🟡</span> Moderate Congestion
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.traffic?.heavy ? '' : 'opacity-30'}`}>
+                            <span>🔴</span> Heavy Congestion
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.routes?.aiRecommended ? '' : 'opacity-30'}`}>
+                            <span>🔵</span> AI Recommended Route
+                          </div>
+                          <div className={`flex items-center gap-2 transition-opacity ${layerState.ai?.xrayMode ? '' : 'opacity-30'}`}>
+                            <span>⚠</span> Predicted SLA Risk
+                          </div>
                         </div>
                       ) : (
                         sec.items.map(item => (
@@ -479,6 +527,9 @@ export default function MapOverviewPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                               </svg>
                             </div>
+                            {item.icon && (
+                              <item.icon className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                            )}
                             <span className="text-[11px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">
                               {item.label}
                             </span>
@@ -704,75 +755,6 @@ export default function MapOverviewPage() {
                 <span className="font-semibold text-slate-500 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-slate-400"/> SLA Risk</span>
                 <span className={`font-black text-sm ${(selectedLink.sla_breach_rate ?? 0) > 30 ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded-md' : 'text-slate-900'}`}>{(selectedLink.sla_breach_rate ?? 0).toFixed(1)}%</span>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedShipment && !selectedNode && !selectedLink && (
-        <div className={`absolute top-6 right-6 z-20 w-[340px] transition-all duration-500 ease-out pointer-events-auto
-          ${panelReady ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 translate-x-12 scale-95'}
-        `}>
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/85 shadow-[0_8px_32px_rgba(0,0,0,0.08),0_0_20px_rgba(16,185,129,0.14)] backdrop-blur-2xl">
-            <div className="flex items-start justify-between border-b border-slate-200/50 bg-gradient-to-b from-white/70 to-transparent p-5">
-              <div>
-                <p className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-600">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Live Shipment
-                </p>
-                <h3 className="text-lg font-black leading-tight text-slate-900">{selectedShipment.shipment_id}</h3>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  {selectedShipment.origin} {"->"} {selectedShipment.destination}
-                </p>
-              </div>
-              <button onClick={() => setSelectedShipment(null)} className="rounded-full bg-white/60 p-1.5 text-slate-500 shadow-sm transition-colors hover:bg-slate-100">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-slate-100 bg-white/75 p-3 shadow-sm">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Progress</p>
-                  <p className="mt-1 text-xl font-black text-slate-900">{selectedShipment.progress.toFixed(1)}%</p>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-white/75 p-3 shadow-sm">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">ETA</p>
-                  <p className="mt-1 text-xl font-black text-slate-900">{selectedShipment.eta_hours}h</p>
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between text-[10px] font-bold text-slate-500">
-                  <span>Transit progress</span>
-                  <Badge variant={selectedShipment.status === "Delayed" ? "error" : "info"}>{selectedShipment.status}</Badge>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${selectedShipment.progress}%` }} />
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
-                <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
-                  <BrainCircuit className="h-3.5 w-3.5" />
-                  Live Routing Signal
-                </p>
-                <p className="text-xs font-semibold leading-5 text-slate-700">
-                  {selectedShipment.status === "Delayed"
-                    ? "This shipment is flagged from the live transaction feed as delayed or SLA breached. Review connected corridor risk before approving new flow on the same lane."
-                    : "This shipment is moving within the live tracking window. Continue monitoring ETA, priority, and connected corridor congestion."}
-                </p>
-              </div>
-
-              <button
-                onClick={() => {
-                  setActiveTab("shipments")
-                  setIsPlaying(true)
-                }}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#00C853] p-2.5 text-xs font-bold text-white shadow-md shadow-[#00C853]/20 transition-all hover:bg-[#16A34A]"
-              >
-                <Play className="h-3.5 w-3.5" /> Follow In Transit Ledger
-              </button>
             </div>
           </div>
         </div>
