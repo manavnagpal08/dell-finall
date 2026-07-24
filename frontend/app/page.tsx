@@ -1,389 +1,1730 @@
 "use client"
 
-import React from "react"
+import React, { useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { motion } from "framer-motion"
-import {
-  ArrowRight,
-  BarChart3,
-  CheckCircle2,
-  GitBranch,
-  Leaf,
-  Map,
-  MessageSquareText,
-  Radar,
-  RefreshCw,
-  Route,
-  ShieldCheck,
-  Sparkles,
-  LockKeyhole,
-  Wrench,
-  Activity,
-  Layers,
-  Database
-} from "lucide-react"
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
-}
-
-const stagger = {
-  visible: { transition: { staggerChildren: 0.1 } }
-}
-
-const features = [
-  {
-    title: "Agentic Route Recommender",
-    desc: "AI-driven decision tree that ranks logistics paths while evaluating cost, SLA, carbon, and transit tradeoffs in real-time.",
-    icon: Route,
-    color: "text-[#2E5BFF]",
-    bg: "bg-[#2E5BFF]/10",
-    border: "border-[#2E5BFF]/20"
-  },
-  {
-    title: "Cost Intelligence Center",
-    desc: "Transaction-level audit engine finding money leaks, cost/km outliers, and top corridor reroute savings automatically.",
-    icon: BarChart3,
-    color: "text-[#00B67A]",
-    bg: "bg-[#00B67A]/10",
-    border: "border-[#00B67A]/20"
-  },
-  {
-    title: "Dynamic Alert Center",
-    desc: "Closed-loop execution engine that turns risk, cost, stock, and congestion signals into accountable next actions.",
-    icon: Radar,
-    color: "text-rose-500",
-    bg: "bg-rose-50",
-    border: "border-rose-200"
-  },
-  {
-    title: "Reverse Logistics & Repair",
-    desc: "Detects over-capacity repair centers (TPRs) and auto-recommends consolidation or restock transfers.",
-    icon: Wrench,
-    color: "text-amber-600",
-    bg: "bg-amber-50",
-    border: "border-amber-200"
-  }
-]
-
-const operationalModules = [
-  { id: "1", title: "Geospatial Visualization", detail: "Network Map, route lines, TPR capacity, heat/bubble risk, corridor cost flows", icon: Map },
-  { id: "2", title: "Route Efficiency", detail: "Top corridors, cost-per-unit-km outliers, bottlenecks, chronic delays", icon: Activity },
-  { id: "3", title: "Routing Agent", detail: "Stock-aware AI decision tree, alternatives, SLA downrank, full justification", icon: BrainCircuitIcon },
-  { id: "4", title: "Cost Model", detail: "Suboptimal transaction audit, savings by hub/category, top-3 what-if", icon: DollarSignIcon },
-  { id: "5", title: "Reverse Logistics", detail: "TPR utilization, closer TPR routing, consolidation, restock alerts", icon: RefreshCw },
-  { id: "6", title: "SLA Predictor", detail: "ML metrics, confusion matrix, route risk integration, feedback loop", icon: ShieldCheck },
-]
-
-const differentiators = [
-  { title: "Dynamic Re-routing", detail: "Simulate a hub outage and auto-reroute affected in-flight shipments in real-time.", icon: RefreshCw },
-  { title: "Natural Language Analytics", detail: "Ask questions like 'which hub has most SLA breaches' and get visual answers.", icon: MessageSquareText },
-  { title: "Pareto Optimization", detail: "Compare cost, speed, SLA, and carbon on a real Pareto frontier for every shipment.", icon: GitBranch },
-  { title: "Carbon-Aware Routing", detail: "Calculate shipment CO2 and surface greener route tradeoffs automatically.", icon: Leaf },
-  { title: "Agent Audit Trail", detail: "Every route shows rules fired, data drivers, confidence, and AI justifications.", icon: LockKeyhole },
-  { title: "Operational Action Queue", detail: "Turns risk, cost, stock, and repair signals into accountable, one-click next actions.", icon: Radar },
-]
-
-// Custom animated flow line for network effect
-function FlowLine({ delay = "0s", top = "50%" }: { delay?: string; top?: string }) {
-  return (
-    <div
-      className="absolute left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00B67A]/20 to-transparent overflow-hidden"
-      style={{ top }}
-    >
-      <div
-        className="absolute top-0 left-0 h-full w-[150px] bg-gradient-to-r from-transparent via-[#00B67A] to-transparent animate-scan"
-        style={{ animationDelay: delay }}
-      ></div>
-    </div>
-  )
-}
-
-function BrainCircuitIcon(props: any) {
-  return <Sparkles {...props} />
-}
-
-function DollarSignIcon(props: any) {
-  return <BarChart3 {...props} />
-}
 
 export default function LandingPage() {
+  useEffect(() => {
+    const header = document.getElementById('siteHeader');
+    const onScroll = () => {
+      if (header) {
+        header.classList.toggle('scrolled', window.scrollY > 40);
+      }
+    };
+    window.addEventListener('scroll', onScroll);
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    const counters = document.querySelectorAll<HTMLElement>('[data-count]');
+    const countIO = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target as HTMLElement;
+        const target = parseInt(el.dataset.count || '0', 10);
+        const divide = parseFloat(el.dataset.divide || '1');
+        const decimals = parseInt(el.dataset.decimals || '0', 10);
+        const prefix = el.dataset.prefix || '';
+        const suffix = el.dataset.suffix || '';
+        const dur = 1500;
+        const start = performance.now();
+        function tick(now: number) {
+          const p = Math.min((now - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          const value = (eased * target) / divide;
+          el.textContent = prefix + value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+        countIO.unobserve(el);
+      });
+    }, { threshold: 0.4 });
+    counters.forEach(c => countIO.observe(c));
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      io.disconnect();
+      countIO.disconnect();
+    };
+  }, []);
+
   return (
-    <main className="min-h-screen bg-[#F8FAFC] selection:bg-[#00B67A] selection:text-white font-sans overflow-hidden">
+    <div id="sanchar-landing">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+        
+        #sanchar-landing {
+          --blue-dark: #2f6fed;
+          --green-dark: #149a52;
+          --ink: #0d1130;
+          --ink-muted: #5b6480;
+          --line-light: #e8ebf3;
+          --surface-2: #f5f8fb;
+          
+          font-family: 'Inter', sans-serif;
+          background: #ffffff;
+          color: var(--ink);
+          overflow-x: hidden;
+          width: 100vw;
+          min-height: 100vh;
+        }
 
-      {/* --- HERO SECTION --- */}
-      <section className="relative min-h-[90vh] flex flex-col justify-center border-b border-slate-200 bg-white">
+        #sanchar-landing * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
 
-        {/* Animated Background Mesh */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-slate-50 to-transparent"></div>
-          <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-[#00B67A]/10 blur-[120px] mix-blend-multiply animate-blob"></div>
-          <div className="absolute top-[20%] -right-[10%] w-[40%] h-[60%] rounded-full bg-[#2E5BFF]/10 blur-[120px] mix-blend-multiply animate-blob animation-delay-2000"></div>
-          <div className="absolute -bottom-[20%] left-[20%] w-[60%] h-[50%] rounded-full bg-[#00B67A]/5 blur-[120px] mix-blend-multiply animate-blob animation-delay-4000"></div>
-          <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-30"></div>
+        #sanchar-landing h1, #sanchar-landing h2, #sanchar-landing h3, #sanchar-landing h4 {
+          font-family: 'Space Grotesk', sans-serif;
+        }
 
-          {/* Animated Supply Chain Lines */}
-          <FlowLine top="20%" delay="0s" />
-          <FlowLine top="45%" delay="1.5s" />
-          <FlowLine top="75%" delay="3s" />
+        #sanchar-landing a {
+          color: inherit;
+          text-decoration: none;
+        }
 
-          {/* Floating Nodes */}
-          <motion.div
-            animate={{ y: [0, -20, 0], opacity: [0.3, 0.8, 0.3] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-[30%] left-[15%] w-3 h-3 rounded-full bg-[#2E5BFF] shadow-[0_0_20px_#2E5BFF]"
-          />
-          <motion.div
-            animate={{ y: [0, 20, 0], opacity: [0.3, 1, 0.3] }}
-            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute top-[60%] right-[20%] w-4 h-4 rounded-full bg-[#00B67A] shadow-[0_0_20px_#00B67A]"
-          />
+        #sanchar-landing .ic svg, #sanchar-landing .icn svg, #sanchar-landing .micn svg, #sanchar-landing .glyph svg, #sanchar-landing .ck svg, #sanchar-landing .shield svg {
+          width: 60%;
+          height: 60%;
+        }
+
+        #sanchar-landing .ck svg {
+          width: 70%;
+          height: 70%;
+        }
+
+        #sanchar-landing .reveal {
+          opacity: 0;
+          transform: translateY(30px);
+          transition: opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1);
+        }
+
+        #sanchar-landing .reveal.in {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        /* ================= NAV ================= */
+        #sanchar-landing header {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 200;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 18px 48px;
+          background: rgba(255,255,255,0.7);
+          backdrop-filter: blur(14px);
+          border-bottom: 1px solid transparent;
+          transition: background .35s ease, border-color .35s ease;
+        }
+
+        #sanchar-landing header.scrolled {
+          background: rgba(255,255,255,0.92);
+          border-color: var(--line-light);
+          box-shadow: 0 1px 0 rgba(20,30,60,0.03);
+        }
+
+        #sanchar-landing .brand-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        #sanchar-landing .logo-badge {
+          width: 36px;
+          height: 36px;
+          flex: none;
+        }
+
+        #sanchar-landing .logo-badge svg {
+          width: 100%;
+          height: 100%;
+          filter: drop-shadow(0 0 8px rgba(20,154,82,0.25));
+        }
+
+        #sanchar-landing .brand-row h1 {
+          font-size: 17px;
+          font-weight: 700;
+          color: var(--ink);
+          line-height: 1.1;
+        }
+
+        #sanchar-landing .brand-row h1 .ai {
+          background: linear-gradient(100deg, var(--blue-dark), var(--green-dark));
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+        }
+
+        #sanchar-landing .brand-row .htag {
+          font-size: 9.5px;
+          letter-spacing: .16em;
+          color: var(--ink-muted);
+          font-weight: 700;
+          margin-top: 2px;
+        }
+
+        #sanchar-landing nav.links {
+          display: flex;
+          gap: 32px;
+          font-size: 14px;
+          color: var(--ink-muted);
+        }
+
+        #sanchar-landing nav.links a {
+          position: relative;
+          padding: 4px 0;
+        }
+
+        #sanchar-landing nav.links a::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          bottom: 0;
+          width: 0;
+          height: 1px;
+          background: var(--green-dark);
+          transition: width .3s ease;
+        }
+
+        #sanchar-landing nav.links a:hover {
+          color: var(--ink);
+        }
+
+        #sanchar-landing nav.links a:hover::after {
+          width: 100%;
+        }
+
+        #sanchar-landing .nav-cta {
+          display: flex;
+          gap: 12px;
+        }
+
+        #sanchar-landing .btn {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 22px;
+          border-radius: 10px;
+          font-size: 13.5px;
+          font-weight: 600;
+          cursor: pointer;
+          border: 1px solid var(--line-light);
+          transition: border-color .25s ease, background .25s ease;
+          will-change: transform;
+        }
+
+        #sanchar-landing .btn-ghost {
+          color: var(--ink);
+          background: var(--surface-2);
+        }
+
+        #sanchar-landing .btn-ghost:hover {
+          background: #eef1f8;
+        }
+
+        #sanchar-landing .btn-solid {
+          color: #fff;
+          border: none;
+          font-weight: 700;
+          background: linear-gradient(100deg, var(--blue-dark), var(--green-dark));
+          box-shadow: 0 12px 26px rgba(20,110,90,0.28);
+        }
+
+        #sanchar-landing .btn-solid:hover {
+          box-shadow: 0 16px 32px rgba(20,110,90,0.38);
+        }
+
+        #sanchar-landing .btn-outline {
+          border: 1px solid #cfd6e8;
+          color: var(--ink);
+          background: #fff;
+        }
+
+        #sanchar-landing .btn-outline:hover {
+          border-color: var(--blue-dark);
+          color: var(--blue-dark);
+        }
+
+        /* ================= HERO ================= */
+        #sanchar-landing .hero {
+          position: relative;
+          overflow: hidden;
+          min-height: 100vh;
+          padding: 130px 48px 0;
+          color: var(--ink);
+          background: radial-gradient(1100px 700px at 12% -10%, rgba(20,154,82,0.08), transparent 60%),
+                     radial-gradient(900px 650px at 100% 15%, rgba(47,111,237,0.08), transparent 55%),
+                     #ffffff;
+          display: flex;
+          flex-direction: column;
+        }
+
+        #sanchar-landing .blob {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(70px);
+          opacity: .35;
+          z-index: 0;
+          animation: blobdrift 14s ease-in-out infinite;
+        }
+
+        #sanchar-landing .blob-a {
+          width: 420px;
+          height: 420px;
+          background: radial-gradient(circle, rgba(20,154,82,0.35), transparent 70%);
+          top: -120px;
+          left: 6%;
+        }
+
+        #sanchar-landing .blob-b {
+          width: 380px;
+          height: 380px;
+          background: radial-gradient(circle, rgba(47,111,237,0.32), transparent 70%);
+          top: 60px;
+          right: 4%;
+          animation-delay: -7s;
+        }
+
+        @keyframes blobdrift {
+          0%,100% { transform: translate(0,0); }
+          50% { transform: translate(24px,-26px); }
+        }
+
+        #sanchar-landing .hero-copy {
+          position: relative;
+          z-index: 3;
+          max-width: 760px;
+          margin: 0 auto;
+          text-align: center;
+          margin-bottom: 8px;
+        }
+
+        #sanchar-landing .eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 9px 20px 9px 10px;
+          border-radius: 999px;
+          background: var(--surface-2);
+          border: 1px solid var(--line-light);
+          font-size: 13.5px;
+          font-weight: 700;
+          color: var(--ink);
+          margin-bottom: 26px;
+          letter-spacing: .02em;
+        }
+
+        #sanchar-landing .eyebrow .tagline-grad {
+          background: linear-gradient(100deg, var(--blue-dark), var(--green-dark));
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+        }
+
+        #sanchar-landing .pulse-dot {
+          position: relative;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--green-dark);
+        }
+
+        #sanchar-landing .pulse-dot::after {
+          content: '';
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 1px solid var(--green-dark);
+          animation: radar 1.8s ease-out infinite;
+        }
+
+        @keyframes radar {
+          0% { transform: scale(.4); opacity: 1; }
+          100% { transform: scale(2.6); opacity: 0; }
+        }
+
+        #sanchar-landing .hero-copy h2 {
+          font-size: 52px;
+          line-height: 1.14;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+          margin-bottom: 18px;
+          color: var(--ink);
+        }
+
+        #sanchar-landing .hero-copy h2 .grad {
+          background: linear-gradient(100deg, var(--blue-dark), var(--green-dark) 65%, #1fae6a);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: shine 7s linear infinite;
+        }
+
+        @keyframes shine {
+          to { background-position: 200% center; }
+        }
+
+        #sanchar-landing .hero-copy p {
+          font-size: 16px;
+          color: var(--ink-muted);
+          line-height: 1.7;
+          max-width: 560px;
+          margin: 0 auto 30px;
+        }
+
+        #sanchar-landing .hero-actions {
+          display: flex;
+          gap: 16px;
+          justify-content: center;
+          margin-bottom: 40px;
+        }
+
+        #sanchar-landing .chip-row {
+          position: relative;
+          z-index: 3;
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+          margin-bottom: 30px;
+          flex-wrap: wrap;
+        }
+
+        #sanchar-landing .chip {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          text-align: center;
+          background: #fff;
+          border: 1px solid var(--line-light);
+          border-radius: 14px;
+          padding: 14px 18px;
+          width: 118px;
+          box-shadow: 0 1px 3px rgba(20,30,60,0.04);
+          transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+        }
+
+        #sanchar-landing .chip:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 14px 28px rgba(20,60,120,0.1);
+          border-color: var(--line-light);
+        }
+
+        #sanchar-landing .chip .ic {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, rgba(47,111,237,0.1), rgba(20,154,82,0.14));
+          color: var(--blue-dark);
+        }
+
+        #sanchar-landing .chip span {
+          font-size: 11.5px;
+          font-weight: 600;
+          color: var(--ink);
+          line-height: 1.3;
+        }
+
+        #sanchar-landing .scene {
+          position: relative;
+          flex: 1;
+          min-height: 300px;
+          z-index: 2;
+          max-width: 1200px;
+          margin: 0 auto;
+          width: 100%;
+        }
+
+        #sanchar-landing .fcard {
+          position: absolute;
+          background: #fff;
+          border: 1px solid var(--line-light);
+          border-radius: 14px;
+          padding: 14px 16px;
+          box-shadow: 0 20px 44px rgba(20,40,80,0.12);
+          animation: drift 6s ease-in-out infinite;
+        }
+
+        @keyframes drift {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+
+        #sanchar-landing .fcard .lbl {
+          font-size: 11px;
+          color: var(--ink-muted);
+          margin-bottom: 6px;
+        }
+
+        #sanchar-landing .fcard .val {
+          font-size: 20px;
+          font-weight: 700;
+          font-family: 'Space Grotesk';
+          color: var(--ink);
+        }
+
+        #sanchar-landing .fcard .up {
+          color: var(--green-dark);
+          font-size: 11.5px;
+          font-weight: 600;
+          margin-left: 6px;
+        }
+
+        #sanchar-landing .card-ship {
+          top: 0;
+          right: 6%;
+          width: 170px;
+        }
+
+        #sanchar-landing .card-otd {
+          top: 150px;
+          right: 0;
+          width: 150px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          animation-delay: .6s;
+        }
+
+        #sanchar-landing .card-cost {
+          bottom: 60px;
+          left: 2%;
+          width: 160px;
+          animation-delay: 1.2s;
+        }
+
+        #sanchar-landing .spark {
+          width: 100%;
+          height: 32px;
+          margin-top: 6px;
+        }
+
+        #sanchar-landing .spark path {
+          fill: none;
+          stroke: url(#sparkGrad);
+          stroke-width: 2;
+          stroke-linecap: round;
+          stroke-dasharray: 200;
+          stroke-dashoffset: 200;
+          animation: drawline 2s ease forwards .4s;
+        }
+
+        @keyframes drawline {
+          to { stroke-dashoffset: 0; }
+        }
+
+        #sanchar-landing .ring-wrap {
+          position: relative;
+          width: 52px;
+          height: 52px;
+          flex: none;
+        }
+
+        #sanchar-landing .ring-wrap svg {
+          transform: rotate(-90deg);
+        }
+
+        #sanchar-landing .ring-bg {
+          fill: none;
+          stroke: #e8ebf3;
+          stroke-width: 6;
+        }
+
+        #sanchar-landing .ring-fg {
+          fill: none;
+          stroke: url(#ringGrad);
+          stroke-width: 6;
+          stroke-linecap: round;
+          stroke-dasharray: 150.8;
+          stroke-dashoffset: 150.8;
+          animation: ringfill 1.8s ease forwards .5s;
+        }
+
+        @keyframes ringfill {
+          to { stroke-dashoffset: 5; }
+        }
+
+        #sanchar-landing .bars {
+          display: flex;
+          align-items: flex-end;
+          gap: 4px;
+          height: 30px;
+          margin-top: 8px;
+        }
+
+        #sanchar-landing .bars i {
+          display: block;
+          width: 6px;
+          border-radius: 3px;
+          background: linear-gradient(180deg, var(--green-dark), var(--blue-dark));
+          transform: scaleY(0);
+          transform-origin: bottom;
+          animation: growbar .7s ease forwards;
+        }
+
+        @keyframes growbar {
+          to { transform: scaleY(1); }
+        }
+
+        #sanchar-landing #mapSvg {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 50px;
+          width: 100%;
+          height: auto;
+          z-index: 1;
+        }
+
+        #sanchar-landing .pin-pulse {
+          animation: pinpulse 2.2s ease-out infinite;
+        }
+
+        @keyframes pinpulse {
+          0% { r: 3; opacity: 1; }
+          100% { r: 16; opacity: 0; }
+        }
+
+        #sanchar-landing .route-path {
+          fill: none;
+          stroke: url(#routeGrad);
+          stroke-width: 2;
+          stroke-dasharray: 6 8;
+          animation: flow 1.4s linear infinite;
+        }
+
+        @keyframes flow {
+          to { stroke-dashoffset: -28; }
+        }
+
+        #sanchar-landing .road-wrap {
+          position: relative;
+          z-index: 2;
+          height: 110px;
+          margin-top: auto;
+        }
+
+        #sanchar-landing .road-floor {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, transparent, rgba(47,111,237,0.05));
+          border-top: 1px solid var(--line-light);
+        }
+
+        #sanchar-landing .road-line {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: repeating-linear-gradient(90deg, rgba(20,30,60,0.18) 0 24px, transparent 24px 48px);
+        }
+
+        #sanchar-landing .truck-wrap {
+          position: absolute;
+          bottom: 12px;
+          left: -260px;
+          animation: drive 9s linear infinite;
+        }
+
+        @keyframes drive {
+          from { left: -260px; }
+          to { left: 104%; }
+        }
+
+        #sanchar-landing .truck-wrap svg {
+          width: 210px;
+          height: auto;
+          filter: drop-shadow(0 10px 18px rgba(20,30,60,0.18));
+        }
+
+        #sanchar-landing .headlight {
+          animation: beam 1.4s ease-in-out infinite;
+        }
+
+        @keyframes beam {
+          0%,100% { opacity: .55; }
+          50% { opacity: 1; }
+        }
+
+        #sanchar-landing .wheel {
+          animation: spinwheel .5s linear infinite;
+          transform-origin: center;
+        }
+
+        @keyframes spinwheel {
+          to { transform: rotate(360deg); }
+        }
+
+        #sanchar-landing .drone-wrap {
+          position: absolute;
+          top: 60px;
+          left: 52%;
+          animation: hoverfly 5s ease-in-out infinite;
+        }
+
+        @keyframes hoverfly {
+          0%,100% { transform: translateY(0) translateX(0); }
+          50% { transform: translateY(-18px) translateX(14px); }
+        }
+
+        #sanchar-landing .prop {
+          animation: propspin .12s linear infinite;
+          transform-origin: center;
+        }
+
+        @keyframes propspin {
+          to { transform: rotate(360deg); }
+        }
+
+        #sanchar-landing .foot-row {
+          position: relative;
+          z-index: 3;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          padding: 18px 22px;
+          margin: 20px auto 40px;
+          border: 1px solid var(--line-light);
+          border-radius: 14px;
+          background: var(--surface-2);
+          flex-wrap: wrap;
+          max-width: 1200px;
+        }
+
+        #sanchar-landing .sec-badge {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 12.5px;
+          color: var(--ink-muted);
+          max-width: 300px;
+        }
+
+        #sanchar-landing .sec-badge .shield {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          background: rgba(20,154,82,0.12);
+          color: var(--green-dark);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex: none;
+        }
+
+        #sanchar-landing .sec-badge b {
+          color: var(--ink);
+          display: block;
+          font-size: 13px;
+          margin-bottom: 2px;
+        }
+
+        #sanchar-landing .brands {
+          display: flex;
+          align-items: center;
+          gap: 22px;
+          flex-wrap: wrap;
+        }
+
+        #sanchar-landing .brands .tby {
+          font-size: 10px;
+          letter-spacing: .14em;
+          color: var(--ink-muted);
+          font-weight: 700;
+          margin-right: 6px;
+        }
+
+        #sanchar-landing .brands span {
+          font-size: 13px;
+          font-weight: 700;
+          color: #5b6486;
+        }
+
+        /* ================= MARQUEE ================= */
+        #sanchar-landing .marquee-wrap {
+          border-top: 1px solid var(--line-light);
+          border-bottom: 1px solid var(--line-light);
+          padding: 20px 0;
+          overflow: hidden;
+          background: var(--surface-2);
+        }
+
+        #sanchar-landing .marquee-track {
+          display: flex;
+          gap: 56px;
+          white-space: nowrap;
+          width: max-content;
+          animation: scroll-left 26s linear infinite;
+        }
+
+        #sanchar-landing .marquee-track span {
+          font-size: 13px;
+          color: var(--ink-muted);
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        #sanchar-landing .marquee-track span::before {
+          content: '◆';
+          color: var(--green-dark);
+          font-size: 8px;
+        }
+
+        @keyframes scroll-left {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+
+        /* ================= SECTIONS ================= */
+        #sanchar-landing section {
+          padding: 110px 48px;
+        }
+
+        #sanchar-landing .wrap {
+          max-width: 1280px;
+          margin: 0 auto;
+        }
+
+        #sanchar-landing .section-head {
+          max-width: 640px;
+          margin-bottom: 54px;
+        }
+
+        #sanchar-landing .section-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: .1em;
+          color: var(--green-dark);
+          margin-bottom: 16px;
+          font-family: 'JetBrains Mono';
+        }
+
+        #sanchar-landing .section-tag::before {
+          content: '';
+          width: 16px;
+          height: 1px;
+          background: var(--green-dark);
+          display: inline-block;
+        }
+
+        #sanchar-landing .section-head h2 {
+          font-size: 34px;
+          font-weight: 600;
+          line-height: 1.22;
+          margin-bottom: 14px;
+          color: var(--ink);
+        }
+
+        #sanchar-landing .section-head p {
+          color: var(--ink-muted);
+          font-size: 15px;
+          line-height: 1.7;
+        }
+
+        #sanchar-landing .pillars {
+          display: grid;
+          grid-template-columns: repeat(3,1fr);
+          gap: 1px;
+          background: var(--line-light);
+          border: 1px solid var(--line-light);
+          border-radius: 20px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(20,30,60,0.04);
+        }
+
+        #sanchar-landing .pillar {
+          background: #fff;
+          padding: 34px 30px;
+          transition: background .3s ease, transform .3s ease, box-shadow .3s ease;
+        }
+
+        #sanchar-landing .pillar:hover {
+          background: var(--surface-2);
+          transform: translateY(-4px);
+          box-shadow: 0 16px 34px rgba(20,60,120,0.08);
+        }
+
+        #sanchar-landing .pillar .idx {
+          font-family: 'JetBrains Mono';
+          font-size: 12px;
+          color: #b0b6d1;
+          margin-bottom: 20px;
+          display: block;
+        }
+
+        #sanchar-landing .pillar .icn {
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
+          margin-bottom: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          background: linear-gradient(135deg, rgba(59,109,251,0.1), rgba(20,154,82,0.12));
+          border: 1px solid var(--line-light);
+          color: var(--blue-dark);
+        }
+
+        #sanchar-landing .pillar h3 {
+          font-size: 17px;
+          font-weight: 600;
+          margin-bottom: 9px;
+          color: var(--ink);
+        }
+
+        #sanchar-landing .pillar p {
+          font-size: 13.5px;
+          color: var(--ink-muted);
+          line-height: 1.7;
+          margin-bottom: 16px;
+        }
+
+        #sanchar-landing .mini-chart {
+          width: 100%;
+          height: 34px;
+          display: block;
+          margin-bottom: 10px;
+        }
+
+        #sanchar-landing .mini-chart .mline {
+          fill: none;
+          stroke: url(#miniGrad);
+          stroke-width: 2;
+          stroke-linecap: round;
+          stroke-dasharray: 220;
+          stroke-dashoffset: 220;
+          transition: stroke-dashoffset 1.4s ease;
+        }
+
+        #sanchar-landing .pillars.in .mini-chart .mline {
+          stroke-dashoffset: 0;
+        }
+
+        #sanchar-landing .mini-bars {
+          display: flex;
+          align-items: flex-end;
+          gap: 5px;
+          height: 34px;
+          margin-bottom: 10px;
+        }
+
+        #sanchar-landing .mini-bars i {
+          display: block;
+          flex: 1;
+          border-radius: 3px;
+          background: linear-gradient(180deg, var(--green-dark), var(--blue-dark));
+          transform: scaleY(0);
+          transform-origin: bottom;
+          transition: transform .6s ease;
+        }
+
+        #sanchar-landing .pillars.in .mini-bars i {
+          transform: scaleY(1);
+        }
+
+        #sanchar-landing .mini-ring {
+          width: 34px;
+          height: 34px;
+          margin-bottom: 10px;
+        }
+
+        #sanchar-landing .mini-ring svg {
+          transform: rotate(-90deg);
+        }
+
+        #sanchar-landing .mini-ring-bg {
+          fill: none;
+          stroke: #e8ebf3;
+          stroke-width: 5;
+        }
+
+        #sanchar-landing .mini-ring-fg {
+          fill: none;
+          stroke: url(#miniGrad);
+          stroke-width: 5;
+          stroke-linecap: round;
+          stroke-dasharray: 88;
+          stroke-dashoffset: 88;
+          transition: stroke-dashoffset 1.4s ease;
+        }
+
+        #sanchar-landing .pillars.in .mini-ring-fg {
+          stroke-dashoffset: 1;
+        }
+
+        #sanchar-landing .pillar-stat {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--ink);
+          font-family: 'Space Grotesk';
+        }
+
+        #sanchar-landing .pillar-stat span {
+          color: var(--green-dark);
+        }
+
+        #sanchar-landing .modules-grid-outer {
+          display: grid;
+          grid-template-columns: 0.8fr 1.2fr;
+          gap: 64px;
+          align-items: start;
+        }
+
+        #sanchar-landing .modules-cards {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        #sanchar-landing .mcard {
+          border: 1px solid var(--line-light);
+          border-radius: 16px;
+          padding: 24px;
+          background: #fff;
+          position: relative;
+          overflow: hidden;
+          transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+        }
+
+        #sanchar-landing .mcard:hover {
+          transform: translateY(-6px);
+          border-color: var(--line-light);
+          box-shadow: 0 20px 40px rgba(20,60,120,0.1);
+        }
+
+        #sanchar-landing .mcard::after {
+          content: '';
+          position: absolute;
+          width: 130px;
+          height: 130px;
+          border-radius: 50%;
+          top: -65px;
+          right: -65px;
+          background: radial-gradient(circle, rgba(20,154,82,0.12), transparent 70%);
+          opacity: 0;
+          transition: opacity .35s ease;
+        }
+
+        #sanchar-landing .mcard:hover::after {
+          opacity: 1;
+        }
+
+        #sanchar-landing .mcard .micn {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, rgba(59,109,251,0.1), rgba(20,154,82,0.12));
+          border: 1px solid var(--line-light);
+          color: var(--blue-dark);
+          font-size: 16px;
+          margin-bottom: 14px;
+        }
+
+        #sanchar-landing .mcard h4 {
+          font-size: 15.5px;
+          font-weight: 600;
+          margin-bottom: 7px;
+          color: var(--ink);
+        }
+
+        #sanchar-landing .mcard p {
+          font-size: 13px;
+          color: var(--ink-muted);
+          line-height: 1.65;
+          margin-bottom: 14px;
+        }
+
+        #sanchar-landing .mcard-chart {
+          width: 100%;
+          height: 44px;
+          display: block;
+          margin-bottom: 10px;
+          position: relative;
+          z-index: 2;
+        }
+
+        #sanchar-landing .mcard-chart .mline2 {
+          fill: none;
+          stroke: url(#miniGrad);
+          stroke-width: 2;
+          stroke-linecap: round;
+          stroke-dasharray: 260;
+          stroke-dashoffset: 260;
+          transition: stroke-dashoffset 1.6s ease;
+        }
+
+        #sanchar-landing .modules-cards.in .mline2 {
+          stroke-dashoffset: 0;
+        }
+
+        #sanchar-landing .mcard-route {
+          fill: none;
+          stroke: url(#miniGrad);
+          stroke-width: 2;
+          stroke-dasharray: 5 6;
+          animation: mcflow 1.2s linear infinite;
+        }
+
+        @keyframes mcflow {
+          to { stroke-dashoffset: -22; }
+        }
+
+        #sanchar-landing .mcard-gauge-bg {
+          fill: none;
+          stroke: #e8ebf3;
+          stroke-width: 6;
+        }
+
+        #sanchar-landing .mcard-gauge-fg {
+          fill: none;
+          stroke: url(#miniGrad);
+          stroke-width: 6;
+          stroke-linecap: round;
+          stroke-dasharray: 69;
+          stroke-dashoffset: 69;
+          transition: stroke-dashoffset 1.6s ease;
+        }
+
+        #sanchar-landing .modules-cards.in .mcard-gauge-fg {
+          stroke-dashoffset: 4;
+        }
+
+        #sanchar-landing .mcard-progress {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 2px;
+        }
+
+        #sanchar-landing .mcard-progress .track {
+          height: 6px;
+          border-radius: 4px;
+          background: #eef1f8;
+          overflow: hidden;
+        }
+
+        #sanchar-landing .mcard-progress .fill {
+          height: 100%;
+          border-radius: 4px;
+          background: linear-gradient(90deg, var(--blue-dark), var(--green-dark));
+          width: 0;
+          transition: width 1.4s ease;
+        }
+
+        #sanchar-landing .modules-cards.in .mcard-progress .fill {
+          width: var(--w);
+        }
+
+        #sanchar-landing .mcard-stat {
+          font-size: 12.5px;
+          font-weight: 700;
+          color: var(--ink);
+          font-family: 'Space Grotesk';
+        }
+
+        #sanchar-landing .mcard-stat span {
+          color: var(--green-dark);
+        }
+
+        #sanchar-landing .split {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+        }
+
+        #sanchar-landing .panel-card {
+          background: #fff;
+          border: 1px solid var(--line-light);
+          border-radius: 20px;
+          padding: 32px;
+          box-shadow: 0 1px 3px rgba(20,30,60,0.04);
+        }
+
+        #sanchar-landing .panel-card h2 {
+          color: var(--ink);
+        }
+
+        #sanchar-landing .checklist {
+          list-style: none;
+          margin-top: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+
+        #sanchar-landing .checklist li {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 16px;
+          background: var(--surface-2);
+          border: 1px solid transparent;
+          border-radius: 12px;
+          font-size: 13.5px;
+          font-weight: 500;
+          color: var(--ink);
+          transition: transform .25s ease, border-color .25s ease, background .25s ease;
+        }
+
+        #sanchar-landing .checklist li:hover {
+          transform: translateX(8px);
+          border-color: var(--line-light);
+          background: #eef3fb;
+        }
+
+        #sanchar-landing .checklist li .ck {
+          width: 19px;
+          height: 19px;
+          border-radius: 50%;
+          flex: none;
+          font-size: 10.5px;
+          background: linear-gradient(135deg, var(--blue-dark), var(--green-dark));
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        #sanchar-landing .steps {
+          margin-top: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+
+        #sanchar-landing .step {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 15px 18px;
+          background: var(--surface-2);
+          border: 1px solid transparent;
+          border-radius: 12px;
+          transition: transform .25s ease, background .25s ease, border-color .25s ease;
+        }
+
+        #sanchar-landing .step:hover {
+          transform: translateX(8px);
+          background: #eef3fb;
+          border-color: var(--line-light);
+        }
+
+        #sanchar-landing .step .n {
+          width: 28px;
+          height: 28px;
+          border-radius: 9px;
+          flex: none;
+          font-size: 12.5px;
+          font-weight: 700;
+          background: #fff;
+          border: 1px solid var(--line-light);
+          color: var(--blue-dark);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: 'JetBrains Mono';
+        }
+
+        #sanchar-landing .step .s {
+          font-size: 13.5px;
+          font-weight: 500;
+          color: var(--ink);
+        }
+
+        #sanchar-landing .final {
+          text-align: center;
+          border-radius: 28px;
+          margin: 0 48px 110px;
+          padding: 88px 40px;
+          background: radial-gradient(700px 340px at 50% 0%, rgba(20,154,82,0.08), transparent 65%), var(--surface-2);
+          border: 1px solid var(--line-light);
+          position: relative;
+          overflow: hidden;
+        }
+
+        #sanchar-landing .final .radar-bg {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 880px;
+          height: 880px;
+          transform: translate(-50%,-50%);
+          border-radius: 50%;
+          border: 1px solid var(--line-light);
+          opacity: .6;
+        }
+
+        #sanchar-landing .final .radar-bg::before, #sanchar-landing .final .radar-bg::after {
+          content: '';
+          position: absolute;
+          inset: 118px;
+          border-radius: 50%;
+          border: 1px solid var(--line-light);
+        }
+
+        #sanchar-landing .final .radar-bg::after {
+          inset: 256px;
+        }
+
+        #sanchar-landing .final .glyph {
+          width: 56px;
+          height: 56px;
+          border-radius: 16px;
+          margin: 0 auto 24px;
+          position: relative;
+          z-index: 2;
+          background: linear-gradient(135deg, var(--blue-dark), var(--green-dark));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 23px;
+          color: #fff;
+          animation: pulsering 2.6s ease-in-out infinite;
+        }
+
+        @keyframes pulsering {
+          0%,100% { box-shadow: 0 0 0 0 rgba(20,154,82,0.35); }
+          50% { box-shadow: 0 0 0 20px rgba(20,154,82,0); }
+        }
+
+        #sanchar-landing .final h2 {
+          font-size: 34px;
+          margin-bottom: 14px;
+          position: relative;
+          z-index: 2;
+          color: var(--ink);
+        }
+
+        #sanchar-landing .final p {
+          color: var(--ink-muted);
+          font-size: 15px;
+          max-width: 580px;
+          margin: 0 auto 32px;
+          line-height: 1.7;
+          position: relative;
+          z-index: 2;
+        }
+
+        #sanchar-landing .final .actions {
+          display: flex;
+          gap: 16px;
+          justify-content: center;
+          position: relative;
+          z-index: 2;
+        }
+
+        #sanchar-landing .final .btn-outline {
+          border: 1px solid #cfd6e8;
+          color: var(--ink);
+          background: #fff;
+        }
+
+        #sanchar-landing .final .btn-outline:hover {
+          border-color: var(--blue-dark);
+          color: var(--blue-dark);
+        }
+
+        #sanchar-landing .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4,1fr);
+          gap: 1px;
+          background: var(--line-light);
+          border: 1px solid var(--line-light);
+          border-radius: 20px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(20,30,60,0.04);
+        }
+
+        #sanchar-landing .stat-box {
+          background: #fff;
+          padding: 38px 30px;
+          text-align: center;
+          transition: background .3s ease, transform .3s ease;
+        }
+
+        #sanchar-landing .stat-box:hover {
+          background: var(--surface-2);
+          transform: translateY(-4px);
+        }
+
+        #sanchar-landing .stat-box .snum {
+          font-size: 38px;
+          font-weight: 700;
+          font-family: 'Space Grotesk';
+          margin-bottom: 8px;
+        }
+
+        #sanchar-landing .stat-box .snum .grad2 {
+          background: linear-gradient(100deg, var(--blue-dark), var(--green-dark));
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+        }
+
+        #sanchar-landing .stat-box .slbl {
+          font-size: 13px;
+          color: var(--ink-muted);
+          line-height: 1.5;
+        }
+
+        #sanchar-landing footer {
+          padding: 36px 48px;
+          text-align: center;
+          color: var(--ink-muted);
+          font-size: 13px;
+          border-top: 1px solid var(--line-light);
+          background: #fff;
+        }
+
+        @media (max-width:960px) {
+          #sanchar-landing .modules-grid-outer, #sanchar-landing .split { grid-template-columns: 1fr; }
+          #sanchar-landing .pillars, #sanchar-landing .stats-grid { grid-template-columns: 1fr 1fr; }
+          #sanchar-landing .modules-cards { grid-template-columns: 1fr; }
+          #sanchar-landing header { padding: 16px 20px; }
+          #sanchar-landing nav.links { display: none; }
+          #sanchar-landing section { padding: 70px 20px; }
+          #sanchar-landing .hero-copy h2 { font-size: 34px; }
+          #sanchar-landing .final { margin: 0 20px 70px; }
+          #sanchar-landing .scene { min-height: 520px; }
+          #sanchar-landing .card-ship, #sanchar-landing .card-otd, #sanchar-landing .card-cost { position: static; margin: 10px auto; width: 220px !important; }
+        }
+      `}} />
+
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <linearGradient id="miniGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#2f6fed" /><stop offset="100%" stopColor="#149a52" />
+          </linearGradient>
+        </defs>
+      </svg>
+
+      <header id="siteHeader">
+        <div className="brand-row">
+          <div className="logo-badge" style={{ display: 'flex', alignItems: 'center' }}>
+            <Image src="/logo.png" alt="Sanchar AI Logo" width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
+          <h1>Sanchar<span className="ai">AI</span><div className="htag">INTELLIGENCE INTO MOTION</div></h1>
+        </div>
+        <nav className="links">
+          <a href="#platform">Platform</a>
+          <a href="#coverage">Coverage</a>
+          <a href="#workflow">Workflow</a>
+        </nav>
+        <div className="nav-cta">
+          <Link href="/auth/login" className="btn btn-ghost"><span>Sign in</span></Link>
+          <Link href="/auth/signup" className="btn btn-solid"><span>Get started &rarr;</span></Link>
+        </div>
+      </header>
+
+      <section className="hero" id="top">
+        <div className="blob blob-a"></div>
+        <div className="blob blob-b"></div>
+
+        <div className="hero-copy reveal in">
+          <div className="eyebrow"><span className="pulse-dot"></span> <span className="tagline-grad">Intelligence into motion</span></div>
+          <h2>AI-powered logistics. <span className="grad">Intelligence that never stops moving.</span></h2>
+          <p>Sanchar AI optimizes your logistics operations with real-time insights, predictive intelligence, and autonomous decisions across every route you run.</p>
+          <div className="hero-actions">
+            <Link href="/auth/signup" className="btn btn-solid"><span>Get started free &rarr;</span></Link>
+            <a href="#platform" className="btn btn-outline"><span>Watch demo</span></a>
+          </div>
         </div>
 
-        <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-10 w-full pt-20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="max-w-2xl">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="px-4 py-2 rounded-full bg-[#00B67A]/10 border border-[#00B67A]/20 flex items-center gap-2 shadow-sm">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#00B67A] animate-pulse"></span>
-                  <span className="text-[11px] font-black text-[#00B67A] uppercase tracking-widest">Enterprise AI Workspace</span>
-                </div>
-              </div>
+        <div className="chip-row">
+          <div className="chip"><div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 1 1-5.66 5.66L4 17l3 3 5.04-5.04a4 4 0 0 1 5.66-5.66z" /><path d="M14 5l2-2 3 3-2 2" /></svg></div><span>Predictive Maintenance</span></div>
+          <div className="chip"><div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="7" width="13" height="9" rx="1" /><path d="M14 10h4l3 3v3h-7z" /><circle cx="6" cy="18" r="1.6" /><circle cx="17" cy="18" r="1.6" /></svg></div><span>Fleet Monitoring</span></div>
+          <div className="chip"><div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="5" cy="6" r="2" /><circle cx="19" cy="18" r="2" /><path d="M5 8c0 5 14 3 14 8" strokeDasharray="2.2 3.2" /></svg></div><span>Route Optimization</span></div>
+          <div className="chip"><div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.2" /></svg></div><span>Live Shipment Tracking</span></div>
+          <div className="chip"><div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="6" width="12" height="12" rx="1.5" /><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" /></svg></div><span>AI Decision Engine</span></div>
+        </div>
 
-              <h1 className="text-5xl md:text-6xl lg:text-[75px] font-black tracking-tighter text-slate-900 leading-[1.05] mb-6">
-                Intelligent Logistics. <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00B67A] to-[#008f5d]">
-                  Zero Compromise.
-                </span>
-              </h1>
+        <div className="scene">
+          <div className="fcard card-ship">
+            <div className="lbl">Live Shipments</div>
+            <div className="val">1,248 <span className="up">&uarr; 12.6%</span></div>
+            <svg className="spark" viewBox="0 0 140 32">
+              <defs><linearGradient id="sparkGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#2f6fed" /><stop offset="100%" stopColor="#149a52" />
+              </linearGradient></defs>
+              <path d="M0 24 L20 20 L40 26 L60 12 L80 16 L100 6 L120 10 L140 2" />
+            </svg>
+          </div>
 
-              <p className="text-lg text-slate-500 font-medium max-w-xl leading-relaxed mb-10">
-                The next-generation supply chain command center. Sanchar AI auto-detects money leaks, mitigates SLA risks, and executes network-wide rerouting with a single click.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4">
-                <Link href="/dashboard" className="flex items-center gap-2 px-8 py-4 rounded-xl bg-[#00B67A] hover:bg-[#009b68] text-white font-black text-lg transition-all shadow-[0_0_30px_rgba(0,182,122,0.3)] hover:shadow-[0_0_40px_rgba(0,182,122,0.5)]">
-                  Enter Command Center <ArrowRight className="w-5 h-5" />
-                </Link>
-                <Link href="/network" className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-black text-lg transition-all shadow-sm hover:shadow-md">
-                  <Map className="w-5 h-5" /> View Network Map
-                </Link>
-              </div>
+          <div className="fcard card-otd">
+            <div className="ring-wrap">
+              <svg viewBox="0 0 60 60" width="52" height="52">
+                <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#2f6fed" /><stop offset="100%" stopColor="#149a52" />
+                </linearGradient></defs>
+                <circle className="ring-bg" cx="30" cy="30" r="24" />
+                <circle className="ring-fg" cx="30" cy="30" r="24" />
+              </svg>
             </div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 50, scale: 0.95 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              transition={{ delay: 0.4, duration: 0.8 }}
-              className="relative hidden lg:block"
-            >
-              <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-slate-200 shadow-2xl shadow-[#00B67A]/20 group">
-                <Image
-                  src="/hero_dashboard.png"
-                  alt="Sanchar AI Dashboard Preview"
-                  fill
-                  sizes="(min-width: 1024px) 50vw, 100vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  priority
-                />
-              </div>
-              <div className="absolute -inset-4 rounded-[2rem] border border-[#00B67A]/20 bg-[#00B67A]/5 -z-10 blur-xl"></div>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Floating Stats Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8, duration: 0.8 }}
-          className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-10 w-full mt-24 pb-12"
-        >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 rounded-[24px] bg-white/80 border border-slate-200/80 backdrop-blur-xl shadow-xl shadow-slate-200/40">
-            {[
-              { label: "Validated Rows", value: "1,800+" },
-              { label: "Network Nodes", value: "20" },
-              { label: "Operational Domains", value: "6" },
-              { label: "AI Accuracy", value: "94.2%" },
-            ].map((stat, idx) => (
-              <div key={idx}>
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">{stat.label}</p>
-                <p className="text-4xl font-black text-slate-900 tracking-tight">{stat.value}</p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
-
-      {/* --- TRUSTED BY BANNER (Animated Marquee) --- */}
-      <section className="py-12 border-b border-slate-200 bg-white overflow-hidden relative">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-10 mb-8">
-          <p className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Built for Global Enterprise Scale</p>
-        </div>
-
-        {/* CSS Marquee Effect */}
-        <div className="flex w-[200%] animate-marquee opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-          <div className="flex items-center justify-around w-1/2 px-10 gap-20">
-            <span className="text-3xl font-black text-slate-800 tracking-tighter whitespace-nowrap">GLOBAL SUPPLY CHAIN</span>
-            <span className="text-3xl font-bold text-slate-800 flex items-center gap-2 whitespace-nowrap"><Layers className="w-8 h-8"/> LOGISTICS CORP</span>
-            <span className="text-3xl font-black text-slate-800 italic whitespace-nowrap">GlobalFreight</span>
-            <span className="text-3xl font-bold text-slate-800 tracking-widest whitespace-nowrap">AERO<span className="text-[#00B67A]">SPACE</span></span>
-          </div>
-          <div className="flex items-center justify-around w-1/2 px-10 gap-20">
-            <span className="text-3xl font-black text-slate-800 tracking-tighter whitespace-nowrap">GLOBAL SUPPLY CHAIN</span>
-            <span className="text-3xl font-bold text-slate-800 flex items-center gap-2 whitespace-nowrap"><Layers className="w-8 h-8"/> LOGISTICS CORP</span>
-            <span className="text-3xl font-black text-slate-800 italic whitespace-nowrap">GlobalFreight</span>
-            <span className="text-3xl font-bold text-slate-800 tracking-widest whitespace-nowrap">AERO<span className="text-[#00B67A]">SPACE</span></span>
-          </div>
-        </div>
-      </section>
-
-      {/* --- THE AI ENGINE HIGHLIGHTS --- */}
-      <section className="py-32 bg-[#F8FAFC] text-slate-900 relative">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-10">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={stagger}
-            className="mb-16"
-          >
-            <motion.h2 variants={fadeUp} className="text-4xl lg:text-5xl font-black tracking-tight mb-4">The AI Engine</motion.h2>
-            <motion.p variants={fadeUp} className="text-lg text-slate-500 font-medium max-w-2xl">
-              A fully integrated suite of analytical tools designed to give you unprecedented visibility and control over your global network.
-            </motion.p>
-          </motion.div>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8"
-          >
-            {features.map((feat, idx) => (
-              <motion.div variants={fadeUp} key={idx} className="group p-8 lg:p-10 rounded-[32px] bg-white border border-slate-200 hover:border-slate-300 transition-all duration-300 hover:shadow-2xl hover:shadow-[#00B67A]/10 hover:-translate-y-2">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${feat.bg} ${feat.color} ${feat.border} border group-hover:scale-110 transition-transform duration-300`}>
-                  <feat.icon className="w-7 h-7" />
-                </div>
-                <h3 className="text-2xl font-black mb-3">{feat.title}</h3>
-                <p className="text-slate-500 font-medium leading-relaxed">{feat.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* --- WHY SANCHAR AI? (DIFFERENTIATORS) --- */}
-      <section className="py-32 bg-white text-slate-900 relative border-t border-slate-200">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-10 relative z-10">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={stagger}
-            className="mb-20 text-center max-w-3xl mx-auto"
-          >
-            <motion.h2 variants={fadeUp} className="text-4xl lg:text-5xl font-black tracking-tight mb-6">Beyond Traditional Routing</motion.h2>
-            <motion.p variants={fadeUp} className="text-lg text-slate-500 font-medium">
-              We don't just visualize data. We close the loop between analytics and operational execution.
-            </motion.p>
-          </motion.div>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8"
-          >
-            {differentiators.map((diff, idx) => (
-              <motion.div variants={fadeUp} key={idx} className="group p-8 rounded-[24px] bg-[#F8FAFC] border border-slate-200 transition-all duration-300 hover:bg-white hover:shadow-xl hover:shadow-[#2E5BFF]/10">
-                <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center mb-6 shadow-sm group-hover:rotate-12 transition-transform duration-300">
-                  <diff.icon className="w-6 h-6 text-[#2E5BFF]" />
-                </div>
-                <h4 className="text-xl font-black mb-3 text-slate-900 group-hover:text-[#2E5BFF] transition-colors duration-300">{diff.title}</h4>
-                <p className="text-slate-500 font-medium leading-relaxed">{diff.detail}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* --- OPERATIONAL COVERAGE --- */}
-      <section className="py-32 bg-[#F8FAFC] border-t border-slate-200 relative">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-10">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={stagger}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16"
-          >
             <div>
-              <motion.div variants={fadeUp} className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="w-5 h-5 text-[#00B67A]" />
-                <span className="text-[12px] font-black uppercase tracking-widest text-slate-500">Operational Coverage</span>
-              </motion.div>
-              <motion.h2 variants={fadeUp} className="text-3xl lg:text-5xl font-black tracking-tight">Live Network Intelligence</motion.h2>
+              <div className="lbl">On-Time Delivery</div>
+              <div className="val" style={{ fontSize: '16px' }}>96.8% <span className="up" style={{ fontSize: '10.5px' }}>&uarr; 8.4%</span></div>
             </div>
-            <motion.p variants={fadeUp} className="text-slate-500 font-medium max-w-md">
-              Real operational views for network visibility, route efficiency, recommendations, cost, reverse logistics, and predictive SLA control.
-            </motion.p>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-50px" }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {operationalModules.map((mod) => (
-              <motion.div variants={fadeUp} key={mod.id} className="group p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex gap-4 hover:border-[#00B67A] transition-colors duration-300">
-                <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-slate-400 font-black text-sm group-hover:bg-[#00B67A] group-hover:text-white transition-colors duration-300">
-                  0{mod.id}
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
-                    {mod.title} <mod.icon className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#00B67A] transition-colors duration-300" />
-                  </h4>
-                  <p className="text-xs font-semibold text-slate-500 leading-relaxed">{mod.detail}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
+          <div className="fcard card-cost">
+            <div className="lbl">Cost Saved <span className="up">&uarr; 15.3%</span></div>
+            <div className="val">&#8377;2.45 Cr</div>
+            <div className="bars">
+              <i style={{ height: '40%', animationDelay: '.2s' }}></i>
+              <i style={{ height: '65%', animationDelay: '.3s' }}></i>
+              <i style={{ height: '50%', animationDelay: '.4s' }}></i>
+              <i style={{ height: '85%', animationDelay: '.5s' }}></i>
+              <i style={{ height: '70%', animationDelay: '.6s' }}></i>
+              <i style={{ height: '100%', animationDelay: '.7s' }}></i>
+            </div>
+          </div>
 
-          <div className="mt-20 text-center">
-            <Link href="/dashboard" className="inline-flex items-center justify-center gap-2 px-10 py-5 rounded-xl bg-[#00B67A] hover:bg-[#009b68] text-white font-black text-lg transition-all shadow-[0_0_30px_rgba(0,182,122,0.3)] hover:shadow-[0_0_40px_rgba(0,182,122,0.5)]">
-              Launch Application <ArrowRight className="w-5 h-5" />
-            </Link>
+          <svg id="mapSvg" viewBox="0 0 900 220" preserveAspectRatio="xMidYMax meet">
+            <defs><linearGradient id="routeGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#2f6fed" /><stop offset="100%" stopColor="#149a52" />
+            </linearGradient></defs>
+            <path className="route-path" d="M120 150 C 260 60, 340 60, 430 110 S 640 170, 760 90" />
+            <circle cx="120" cy="150" r="4" fill="#149a52" />
+            <circle className="pin-pulse" cx="120" cy="150" r="3" fill="none" stroke="#149a52" strokeWidth="1.5" />
+            <circle cx="430" cy="110" r="4" fill="#2f6fed" />
+            <circle className="pin-pulse" cx="430" cy="110" r="3" fill="none" stroke="#2f6fed" strokeWidth="1.5" style={{ animationDelay: '.7s' }} />
+            <circle cx="760" cy="90" r="4" fill="#149a52" />
+            <circle className="pin-pulse" cx="760" cy="90" r="3" fill="none" stroke="#149a52" strokeWidth="1.5" style={{ animationDelay: '1.4s' }} />
+          </svg>
+
+          <div className="drone-wrap">
+            <svg viewBox="0 0 80 50" width="70" height="44">
+              <line x1="18" y1="18" x2="8" y2="8" stroke="#9fb3d9" strokeWidth="2" />
+              <line x1="62" y1="18" x2="72" y2="8" stroke="#9fb3d9" strokeWidth="2" />
+              <line x1="18" y1="32" x2="8" y2="42" stroke="#9fb3d9" strokeWidth="2" />
+              <line x1="62" y1="32" x2="72" y2="42" stroke="#9fb3d9" strokeWidth="2" />
+              <g className="prop"><circle cx="8" cy="8" r="9" fill="none" stroke="#2f6fed" strokeWidth="2" /></g>
+              <g className="prop" style={{ animationDelay: '-.05s' }}><circle cx="72" cy="8" r="9" fill="none" stroke="#2f6fed" strokeWidth="2" /></g>
+              <g className="prop" style={{ animationDelay: '-.02s' }}><circle cx="8" cy="42" r="9" fill="none" stroke="#2f6fed" strokeWidth="2" /></g>
+              <g className="prop" style={{ animationDelay: '-.08s' }}><circle cx="72" cy="42" r="9" fill="none" stroke="#2f6fed" strokeWidth="2" /></g>
+              <rect x="26" y="19" width="28" height="12" rx="4" fill="url(#logoGrad)" />
+              <circle cx="40" cy="25" r="3" fill="#149a52" />
+            </svg>
+          </div>
+
+          <div className="road-wrap">
+            <div className="road-floor"></div>
+            <div className="road-line"></div>
+            <div className="truck-wrap">
+              <svg viewBox="0 0 220 90">
+                <rect x="0" y="30" width="70" height="38" rx="6" fill="#eef2fb" stroke="#c7cfe4" />
+                <rect x="8" y="38" width="24" height="16" rx="2" fill="#2f6fed" opacity="0.35" />
+                <circle className="headlight" cx="4" cy="58" r="4" fill="#f4b93d" />
+                <rect x="72" y="14" width="140" height="54" rx="6" fill="#ffffff" stroke="#c7cfe4" />
+                <rect x="80" y="22" width="124" height="16" rx="3" fill="#149a52" opacity="0.16" />
+                <text x="90" y="55" fill="#2f6fed" fontSize="13" fontFamily="Space Grotesk" fontWeight="700">Sanchar AI</text>
+                <g className="wheel"><circle cx="34" cy="70" r="12" fill="#2a3350" stroke="#c7cfe4" strokeWidth="3" /></g>
+                <g className="wheel"><circle cx="150" cy="70" r="12" fill="#2a3350" stroke="#c7cfe4" strokeWidth="3" /></g>
+                <g className="wheel"><circle cx="185" cy="70" r="12" fill="#2a3350" stroke="#c7cfe4" strokeWidth="3" /></g>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="foot-row">
+          <div className="sec-badge">
+            <div className="shield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg></div>
+            <div><b>Enterprise Grade Security</b>Your data is protected with end-to-end encryption and AI threat detection.</div>
+          </div>
+          <div className="brands">
+            <span className="tby">TRUSTED BY LOGISTICS LEADERS</span>
+            <span>DHL</span><span>MAERSK</span><span>DELHIVERY</span><span>DP WORLD</span><span>BLUE DART</span>
           </div>
         </div>
       </section>
 
-      {/* --- FOOTER --- */}
-      <footer className="bg-white border-t border-slate-200 py-12">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-12 h-12 flex items-center justify-center shrink-0">
-              <Image src="/logo.png" alt="Sanchar AI Logo" width={48} height={48} className="h-full w-full object-contain" />
-            </div>
-            <span className="font-black text-slate-900 text-xl tracking-tight">Sanchar AI</span>
+      <div className="marquee-wrap">
+        <div className="marquee-track">
+          <span>Route scoring</span><span>SLA breach prediction</span><span>Reverse logistics</span><span>Hub load balancing</span><span>Executive approvals</span><span>Cost discovery</span><span>Audit trails</span>
+          <span>Route scoring</span><span>SLA breach prediction</span><span>Reverse logistics</span><span>Hub load balancing</span><span>Executive approvals</span><span>Cost discovery</span><span>Audit trails</span>
+        </div>
+      </div>
+
+      <section>
+        <div className="wrap">
+          <div className="section-head reveal">
+            <div className="section-tag">impact in numbers</div>
+            <h2>Trusted at network scale.</h2>
+            <p>Live figures pulled from the same command tower your team works in every day.</p>
           </div>
-          <p className="text-sm font-semibold text-slate-400">
-            © 2026 Sanchar AI. Logistics intelligence for resilient supply chains.
-          </p>
-          <div className="flex items-center gap-6 text-sm font-bold text-slate-400">
-            <span className="hover:text-slate-900 cursor-pointer transition-colors">Documentation</span>
-            <span className="hover:text-slate-900 cursor-pointer transition-colors">API Status</span>
-            <span className="hover:text-slate-900 cursor-pointer transition-colors">Security</span>
+          <div className="stats-grid reveal">
+            <div className="stat-box"><div className="snum"><span className="grad2" data-count="1800" data-suffix="+">0</span></div><div className="slbl">Transactions processed</div></div>
+            <div className="stat-box"><div className="snum"><span className="grad2" data-count="968" data-decimals="1" data-divide="10" data-suffix="%">0</span></div><div class="slbl">On-time delivery rate</div></div>
+            <div className="stat-box"><div className="snum"><span className="grad2" data-count="245" data-decimals="2" data-divide="100" data-prefix="₹" data-suffix=" Cr">0</span></div><div className="slbl">Logistics cost saved</div></div>
+            <div className="stat-box"><div className="snum"><span className="grad2" data-count="18" data-suffix="+">0</span></div><div className="slbl">Command modules live</div></div>
           </div>
         </div>
-      </footer>
+      </section>
 
-    </main>
+      <section id="platform">
+        <div className="wrap">
+          <div className="section-head reveal">
+            <div className="section-tag">core pillars</div>
+            <h2>Three disciplines, one command surface.</h2>
+            <p>Sanchar AI collapses network decisioning, daily operational UX, and production-grade foundations into a single workspace.</p>
+          </div>
+          <div className="pillars reveal">
+            <div className="pillar">
+              <span className="idx">01</span>
+              <div className="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z" /><path d="M3 13l9 5 9-5" /></svg></div>
+              <h3>Network decisioning</h3>
+              <p>Built around route optimization, cost reduction, SLA control, and logistics network analysis.</p>
+              <svg className="mini-chart" viewBox="0 0 200 34"><path className="mline" d="M0 26 L30 20 L60 24 L90 12 L120 16 L150 6 L180 10 L200 2" /></svg>
+              <div className="pillar-stat"><span data-count="18" data-suffix="%">0</span> faster route decisions</div>
+            </div>
+            <div className="pillar">
+              <span className="idx">02</span>
+              <div className="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.3" /><rect x="14" y="3" width="7" height="7" rx="1.3" /><rect x="3" y="14" width="7" height="7" rx="1.3" /><rect x="14" y="14" width="7" height="7" rx="1.3" /></svg></div>
+              <h3>Operational UX</h3>
+              <p>Designed for repeated daily use with dense dashboards, filters, maps, exports, and review flows.</p>
+              <div className="mini-bars">
+                <i style={{ height: '35%', transitionDelay: '.05s' }}></i>
+                <i style={{ height: '55%', transitionDelay: '.1s' }}></i>
+                <i style={{ height: '40%', transitionDelay: '.15s' }}></i>
+                <i style={{ height: '75%', transitionDelay: '.2s' }}></i>
+                <i style={{ height: '60%', transitionDelay: '.25s' }}></i>
+                <i style={{ height: '90%', transitionDelay: '.3s' }}></i>
+                <i style={{ height: '70%', transitionDelay: '.35s' }}></i>
+              </div>
+              <div className="pillar-stat"><span data-count="24">0</span>/7 live dashboard refresh</div>
+            </div>
+            <div className="pillar">
+              <span className="idx">03</span>
+              <div className="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg></div>
+              <h3>Production foundation</h3>
+              <p>Signup, login, reset password, protected routes, API checks, and governed source data.</p>
+              <div className="mini-ring">
+                <svg viewBox="0 0 34 34"><circle className="mini-ring-bg" cx="17" cy="17" r="14" /><circle className="mini-ring-fg" cx="17" cy="17" r="14" /></svg>
+              </div>
+              <div className="pillar-stat"><span data-count="999" data-divide="10" data-decimals="1" data-suffix="%">0</span> platform uptime</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="wrap">
+          <div className="modules-grid-outer">
+            <div className="reveal">
+              <div className="section-tag">platform modules</div>
+              <h2>Everything needed to move from data to decision.</h2>
+              <p style={{ color: 'var(--ink-muted)', fontSize: '14.5px', lineHeight: '1.75', maxWidth: '400px' }}>The app is not just a landing page. It ships an operational workspace covering dashboards, maps, intelligence panels, reports, and approvals.</p>
+            </div>
+            <div className="modules-cards reveal">
+              <div className="mcard">
+                <div className="micn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M4 15a8 8 0 1 1 16 0" /><path d="M12 15l4-5" /></svg></div>
+                <h4>Mission Control</h4>
+                <p>Live KPI board for shipments, SLA breaches, tamper alerts, network health, and operational search.</p>
+                <svg className="mcard-chart" viewBox="0 0 220 44"><path className="mline2" d="M0 34 L25 30 L50 36 L75 18 L100 24 L125 8 L150 14 L175 4 L200 10 L220 2" /></svg>
+                <div className="mcard-stat"><span data-count="1248" data-suffix=" live">0</span> shipments tracked</div>
+              </div>
+              <div className="mcard">
+                <div className="micn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="5" cy="6" r="2" /><circle cx="19" cy="18" r="2" /><path d="M5 8c0 5 14 3 14 8" strokeDasharray="2.2 3.2" /></svg></div>
+                <h4>Route Intelligence</h4>
+                <p>Corridor scoring, hub load review, route comparison, and export-ready recommendations.</p>
+                <svg className="mcard-chart" viewBox="0 0 220 44">
+                  <circle cx="12" cy="34" r="4" fill="#149a52" />
+                  <circle cx="208" cy="10" r="4" fill="#2f6fed" />
+                  <path className="mcard-route" d="M12 34 C 70 40, 100 6, 208 10" />
+                </svg>
+                <div className="mcard-stat"><span data-count="32" data-suffix="%">0</span> faster route scoring</div>
+              </div>
+              <div className="mcard">
+                <div className="micn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 1 1-5.66 5.66L4 17l3 3 5.04-5.04a4 4 0 0 1 5.66-5.66z" /><path d="M14 5l2-2 3 3-2 2" /></svg></div>
+                <h4>Reverse Logistics</h4>
+                <p>Repair-center capacity, smart swaps, inventory redeployment, and stockout prevention workflows.</p>
+                <svg className="mcard-chart" viewBox="0 0 100 44" style={{ width: '60px', height: '44px' }}>
+                  <path className="mcard-gauge-bg" d="M8 38 A 22 22 0 0 1 92 38" />
+                  <path className="mcard-gauge-fg" d="M8 38 A 22 22 0 0 1 92 38" />
+                </svg>
+                <div className="mcard-stat"><span data-count="94" data-suffix="%">0</span> parts recovered</div>
+              </div>
+              <div className="mcard">
+                <div className="micn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="4" width="14" height="17" rx="1.5" /><path d="M9 3h6v3H9z" /><path d="M9 13l2 2 4-4" /></svg></div>
+                <h4>Executive Governance</h4>
+                <p>War-room approvals, reports, audit trails, and settings for production operations.</p>
+                <div className="mcard-progress">
+                  <div className="track"><div className="fill" style={{ '--w': '82%' } as React.CSSProperties}></div></div>
+                  <div className="track"><div className="fill" style={{ '--w': '64%' } as React.CSSProperties}></div></div>
+                  <div className="track"><div className="fill" style={{ '--w': '93%' } as React.CSSProperties}></div></div>
+                </div>
+                <div className="mcard-stat"><span data-count="128">0</span> approvals this week</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="coverage">
+        <div className="wrap">
+          <div className="split">
+            <div className="panel-card reveal">
+              <h2 style={{ fontSize: '26px' }}>Operational coverage</h2>
+              <ul className="checklist">
+                <li><span className="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6" /></svg></span> Forward logistics route optimization</li>
+                <li><span className="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6" /></svg></span> Reverse logistics and repair center balancing</li>
+                <li><span className="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6" /></svg></span> SLA breach prediction and alerting</li>
+                <li><span className="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6" /></svg></span> Cost reduction through route discovery</li>
+                <li><span className="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6" /></svg></span> Dataset-backed analytics and executive reporting</li>
+                <li><span className="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6" /></svg></span> Enterprise-grade authenticated production access</li>
+              </ul>
+            </div>
+
+            <div className="panel-card reveal" id="workflow">
+              <h2 style={{ fontSize: '26px' }}>Decision workflow</h2>
+              <div className="steps">
+                <div className="step"><span className="n">01</span><span className="s">Ingest logistics workbook</span></div>
+                <div className="step"><span className="n">02</span><span className="s">Validate hubs, parts, TPRs, transactions</span></div>
+                <div className="step"><span className="n">03</span><span className="s">Score route, SLA, cost, and repair risk</span></div>
+                <div className="step"><span className="n">04</span><span className="s">Recommend reroutes and redeployments</span></div>
+                <div className="step"><span className="n">05</span><span className="s">Approve, export, and monitor execution</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="final reveal">
+        <div className="radar-bg"></div>
+        <div className="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg></div>
+        <h2>Ready for the next review pass.</h2>
+        <p>Explore dashboards, route intelligence, predictions, repairs, reports, and executive approvals &mdash; all inside one command tower.</p>
+        <div className="actions">
+          <Link href="/auth/signup" className="btn btn-solid"><span>Get started free &rarr;</span></Link>
+          <a href="#platform" className="btn btn-outline"><span>Talk to sales</span></a>
+        </div>
+      </div>
+
+      <footer>&copy; 2026 Sanchar AI &mdash; intelligence into motion, for the modern supply network.</footer>
+    </div>
   )
 }
