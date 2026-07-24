@@ -24,6 +24,10 @@ import {
   InventoryOptimizationData,
   HubOptimizationData,
   ConsolidationData,
+  SettingsAuditLog,
+  PlatformHealth,
+  DemandPositioningData,
+  RiskEvent,
   MLModelResponse,
   TrainingResponse,
   TrainingRequest,
@@ -184,6 +188,18 @@ export function useGetNetworkOverview(params: {
   })
 }
 
+// 8.5 Get Risk Overlay Query
+export function useGetRiskOverlay() {
+  return useQuery<RiskEvent[]>({
+    queryKey: ["risk-overlay"],
+    queryFn: async () => {
+      const response = await apiClient.get("/network/risk-overlay")
+      return response.data
+    },
+    refetchInterval: 60000 // Refresh every minute for live data
+  })
+}
+
 // 9. Get Scored Corridors Query
 export function useGetScoredCorridors(filters?: unknown) {
   return useQuery<ScoredCorridor[]>({
@@ -320,6 +336,21 @@ export function useGetConsolidationOpportunities(filters: OptimizationFilters = 
     queryKey: ["optimization-consolidation", cleaned],
     queryFn: async () => {
       const response = await apiClient.get("/optimization/consolidation", { params: cleaned })
+      return response.data
+    }
+  })
+}
+
+// 18.5 Get Demand Positioning Query
+export function useGetDemandPositioning(filters: OptimizationFilters = {}) {
+  const cleaned: Record<string, any> = {}
+  Object.entries(filters).forEach(([key, val]) => {
+    if (val) cleaned[key] = val
+  })
+  return useQuery<DemandPositioningData>({
+    queryKey: ["optimization-demand-positioning", cleaned],
+    queryFn: async () => {
+      const response = await apiClient.get("/optimization/demand-positioning", { params: cleaned })
       return response.data
     }
   })

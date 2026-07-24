@@ -8,7 +8,6 @@ import {
   Home,
   Package,
   AlertTriangle,
-  Truck,
   Coins,
   RefreshCw,
   ShieldAlert,
@@ -42,15 +41,14 @@ const sections = [
       { name: "Operations Explorer", href: "/operations", icon: Package },
       { name: "AI Recommendation Center", href: "/ai-recommendation-center", icon: RefreshCw },
       { name: "AI Decision Lab", href: "/ai-decision-lab", icon: BrainCircuit },
-      { name: "Routing Intelligence", href: "/route-intelligence", icon: Truck },
       { name: "Routing", href: "/routing", icon: Map },
-      { name: "Route Discovery", href: "/recommendations", icon: Compass },
     ]
   },
   {
     title: "Optimization",
     items: [
       { name: "Cost Optimization", href: "/cost-optimization", icon: Coins },
+      { name: "Demand Positioning", href: "/demand-positioning", icon: Package },
       { name: "Risk Center", href: "/predictions", icon: ShieldAlert },
       { name: "Carrier Intelligence Center", href: "/carrier-intelligence", icon: BarChart3 },
       { name: "AI Sustainability Tree", href: "/sustainability", icon: Leaf },

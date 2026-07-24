@@ -8,9 +8,25 @@ class ConnectorBase(BaseModel):
     enabled: bool
     status: str # 'connected', 'disconnected', 'error'
     config: Optional[Dict[str, Any]] = {}
+    cadence: Optional[str] = None
+    category: Optional[str] = None
+    endpoint: Optional[str] = None
+    auth_type: Optional[str] = None
+    entities: Optional[List[str]] = None
 
 class ConnectorCreate(ConnectorBase):
     pass
+
+class ConnectorUpdate(BaseModel):
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+    status: Optional[str] = None
+    cadence: Optional[str] = None
+    category: Optional[str] = None
+    endpoint: Optional[str] = None
+    auth_type: Optional[str] = None
+    entities: Optional[List[str]] = None
+    config: Optional[Dict[str, Any]] = None
 
 class Connector(ConnectorBase):
     id: str
@@ -29,6 +45,11 @@ class SyncJob(BaseModel):
     rows_failed: int = 0
     duration_seconds: Optional[int] = None
     error_message: Optional[str] = None
+
+class SyncResult(BaseModel):
+    connector: Connector
+    job: SyncJob
+    message: str
 
 class AuditLog(BaseModel):
     id: str

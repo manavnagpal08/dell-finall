@@ -7,7 +7,8 @@ from backend.optimization.schemas.optimization import (
     ReverseOptimizationData,
     InventoryOptimizationData,
     HubOptimizationData,
-    ConsolidationData
+    ConsolidationData,
+    DemandPositioningData
 )
 from backend.optimization.services.opportunity import opportunity_service
 from backend.optimization.services.cost_optimization import cost_optimization_engine
@@ -15,6 +16,7 @@ from backend.optimization.services.reverse_optimization import reverse_optimizat
 from backend.optimization.services.inventory_optimization import inventory_optimization_engine
 from backend.optimization.services.hub_optimization import hub_optimization_engine
 from backend.optimization.services.consolidation import consolidation_engine
+from backend.optimization.services.demand_positioning import demand_positioning_engine
 from typing import Optional
 
 router = APIRouter()
@@ -191,4 +193,33 @@ def get_consolidation_opportunities(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to evaluate duplicate shipment consolidation opportunities: {str(e)}"
+        )
+
+@router.get("/demand-positioning", response_model=DemandPositioningData)
+def get_demand_positioning(
+    region: Optional[str] = None,
+    part_category: Optional[str] = None,
+    priority: Optional[str] = None,
+    hub_id: Optional[str] = None,
+    tpr_id: Optional[str] = None,
+    flow_type: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns predictive demand positioning insights to solve cross-city stockouts.
+    """
+    try:
+        return demand_positioning_engine.optimize(
+            db=db,
+            region=region,
+            part_category=part_category,
+            priority=priority,
+            hub_id=hub_id,
+            tpr_id=tpr_id,
+            flow_type=flow_type
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to evaluate demand positioning opportunities: {str(e)}"
         )

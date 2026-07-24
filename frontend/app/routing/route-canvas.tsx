@@ -6,11 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import "leaflet/dist/leaflet.css";
 
-let L: any = null;
-if (typeof window !== "undefined") {
-  L = require("leaflet");
-}
-
 function getTransportMode(distance: number, index: number) {
   if (distance > 3000) return { mode: 'Sea', icon: Ship, color: '#06B6D4', dash: '4 6' };
   if (distance > 1000) return { mode: 'Air', icon: Plane, color: '#3B82F6', dash: '8 8' };
@@ -21,6 +16,7 @@ function getTransportMode(distance: number, index: number) {
 export function RouteCanvas({ route, originName, destinationName, hubs }: any) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
+  const [leaflet, setLeaflet] = useState<any>(null);
   const [simulationState, setSimulationState] = useState<"idle" | "playing" | "completed">("idle");
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1);
   const [vehicleProgress, setVehicleProgress] = useState(0); 
@@ -35,12 +31,17 @@ export function RouteCanvas({ route, originName, destinationName, hubs }: any) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !mapRef.current || mapInstance) return;
-    
-    const map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([20, 78], 4);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-    setMapInstance(map);
 
-    return () => { map.remove(); };
+    let map: any;
+    import("leaflet").then((L) => {
+      if (!mapRef.current) return;
+      map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([20, 78], 4);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+      setLeaflet(L);
+      setMapInstance(map);
+    });
+
+    return () => { if (map) map.remove(); };
   }, [mapRef]);
 
   const updateProjected = React.useCallback(() => {
@@ -53,8 +54,8 @@ export function RouteCanvas({ route, originName, destinationName, hubs }: any) {
   }, [mapInstance, coords]);
 
   useEffect(() => {
-    if (mapInstance && coords.length > 0) {
-      const bounds = L.latLngBounds(coords.map((c: any) => [c.lat, c.lng]));
+    if (mapInstance && leaflet && coords.length > 0) {
+      const bounds = leaflet.latLngBounds(coords.map((c: any) => [c.lat, c.lng]));
       mapInstance.flyToBounds(bounds, { padding: [80, 80], maxZoom: 6 });
       
       mapInstance.on('move', updateProjected);
@@ -69,7 +70,7 @@ export function RouteCanvas({ route, originName, destinationName, hubs }: any) {
         mapInstance.off('zoom', updateProjected);
       }
     };
-  }, [mapInstance, route]);
+  }, [mapInstance, leaflet, route, coords, updateProjected]);
 
   useEffect(() => {
     if (simulationState !== "playing" || projectedCoords.length < 2) return;

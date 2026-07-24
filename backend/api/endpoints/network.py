@@ -52,3 +52,23 @@ def get_network_overview(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate Supply Chain Control Tower stats: {str(e)}"
         )
+
+from typing import List
+from backend.schemas.risk import RiskEvent
+from backend.services.risk_service import risk_service
+
+@router.get("/risk-overlay", response_model=List[RiskEvent])
+def get_risk_overlay(db: Session = Depends(get_db)):
+    """
+    Retrieves real-time global disaster and geopolitical risks using GDACS live feeds, 
+    calculates intersections with our Hub locations, and returns risk radii.
+    """
+    try:
+        data = risk_service.get_realtime_risk_overlay(db=db)
+        return data
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch real-time risk data: {str(e)}"
+        )
+

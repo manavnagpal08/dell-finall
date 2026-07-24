@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { 
-  ChevronRight, Settings2, RefreshCw, Bell, Search, MapPin, 
-  RotateCcw, Zap, Play, Flag, ChevronDown, CheckCircle2, Navigation, 
-  Sparkles, Clock, ShieldCheck 
+  ChevronRight, RefreshCw, Search, MapPin, 
+  Zap, Play, Flag, CheckCircle2, Navigation, 
+  Sparkles, Clock, ShieldCheck, AlertTriangle
 } from "lucide-react";
 import { useGetHubs, useGetParts, useGetRecommendations } from "@/services/queries";
 import { RouteMap } from "./route-map";
@@ -25,6 +25,8 @@ export default function AI_Route_Discovery() {
   const [priority, setPriority] = useState("P1 - Critical");
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [simulationStep, setSimulationStep] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     setSimulationStep(0);
@@ -44,7 +46,15 @@ export default function AI_Route_Discovery() {
   }, [destination, hubs, origin, partNo, parts]);
 
   const handleGenerate = () => {
-    if (!origin || !destination || !partNo || origin === destination) return;
+    if (!origin || !destination || !partNo) {
+      setMessage("Select origin, destination, and part before generating routes.");
+      return;
+    }
+    if (origin === destination) {
+      setMessage("Origin and destination must be different.");
+      return;
+    }
+    setMessage("");
     setSelectedRouteIndex(0);
     recommendationMutation.mutate({
       origin,
@@ -53,6 +63,9 @@ export default function AI_Route_Discovery() {
       quantity,
       priority,
       required_delivery_window_days: deliveryWindow
+    }, {
+      onSuccess: () => setLastUpdated(new Date()),
+      onError: () => setMessage("Backend route recommendation failed. Please check the route intelligence API."),
     });
   };
 
@@ -60,6 +73,24 @@ export default function AI_Route_Discovery() {
   const alternatives = recommendationMutation.data?.alternatives || [];
   const routes = recommendedRoute ? [recommendedRoute, ...alternatives] : [];
   const selectedRoute = routes[selectedRouteIndex] || null;
+  const isLoadingInputs = hubsLoading || partsLoading;
+  const isGenerating = recommendationMutation.isPending;
+  const selectedOriginHub = hubs.find((h:any)=>h.hub_id===origin);
+  const selectedDestinationHub = hubs.find((h:any)=>h.hub_id===destination);
+  const selectedPart = parts.find((p:any)=>p.part_no===partNo);
+  const costValues = routes.map((route: any) => route.total_cost);
+  const etaValues = routes.map((route: any) => route.total_transit_days);
+  const minCost = costValues.length ? Math.min(...costValues) : 0;
+  const maxCost = costValues.length ? Math.max(...costValues) : 0;
+  const minEta = etaValues.length ? Math.min(...etaValues) : 0;
+  const maxEta = etaValues.length ? Math.max(...etaValues) : 0;
+  const costPadding = Math.max(100, (maxCost - minCost) * 0.15);
+  const etaPadding = Math.max(0.5, (maxEta - minEta) * 0.15);
+  const costAxisMin = Math.max(0, minCost - costPadding);
+  const costAxisMax = maxCost + costPadding;
+  const etaAxisMin = Math.max(0, minEta - etaPadding);
+  const etaAxisMax = maxEta + etaPadding;
+  const routeLabel = selectedRouteIndex === 0 ? "Recommended Route" : `Alternative Route ${selectedRouteIndex}`;
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] font-sans text-slate-800 flex flex-col">
@@ -72,23 +103,15 @@ export default function AI_Route_Discovery() {
         </div>
         
         <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50">
-            <Settings2 className="w-4 h-4" /> Optimization Preferences
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#007A5E] text-white rounded-lg text-sm font-bold hover:bg-[#00664d]">
-            <RefreshCw className="w-4 h-4" /> Regenerate Routes
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating || isLoadingInputs}
+            className="flex items-center gap-2 px-4 py-2 bg-[#007A5E] disabled:bg-slate-300 text-white rounded-lg text-sm font-bold hover:bg-[#00664d]"
+          >
+            <RefreshCw className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} /> {routes.length ? "Regenerate Routes" : "Generate Routes"}
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-700">
-            <div className="w-2 h-2 bg-[#007A5E] rounded-full" /> Live Data
-          </div>
-          <div className="relative">
-            <Bell className="w-5 h-5 text-slate-500" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 text-[8px] text-white font-bold rounded-full flex items-center justify-center">2</div>
-          </div>
-          <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
-            <div className="w-8 h-8 rounded-full bg-[#007A5E] text-white flex items-center justify-center font-bold text-sm">A</div>
-            <span className="text-sm font-bold text-slate-700">Admin</span>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <div className={`w-2 h-2 rounded-full ${recommendationMutation.isError ? "bg-red-500" : "bg-[#007A5E]"}`} /> Backend Data
           </div>
         </div>
       </header>
@@ -106,32 +129,24 @@ export default function AI_Route_Discovery() {
           </div>
           
           <div className="p-5 flex-1 space-y-5">
-            {/* Tabs */}
-            <div className="flex bg-slate-50 rounded-lg p-1">
-              <button className="flex-1 text-[11px] font-bold bg-white text-[#007A5E] py-1.5 rounded-md shadow-sm border border-slate-200">Manual Input</button>
-              <button className="flex-1 text-[11px] font-bold text-slate-500 py-1.5">Voice Input</button>
-              <button className="flex-1 text-[11px] font-bold text-slate-500 py-1.5">QR / Scan</button>
-              <button className="flex-1 text-[11px] font-bold text-slate-500 py-1.5">Load Saved</button>
-            </div>
-
             {/* Inputs */}
             <div>
               <label className="text-[11px] font-bold text-slate-700 mb-1.5 block">Origin Hub</label>
-              <select value={origin} onChange={e => setOrigin(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 outline-none">
+              <select value={origin} onChange={e => setOrigin(e.target.value)} disabled={isLoadingInputs} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 outline-none disabled:bg-slate-50">
                 {hubs.map((h: any) => <option key={h.hub_id} value={h.hub_id}>{h.hub_name}</option>)}
               </select>
             </div>
             
             <div>
               <label className="text-[11px] font-bold text-slate-700 mb-1.5 block">Destination Hub</label>
-              <select value={destination} onChange={e => setDestination(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 outline-none">
+              <select value={destination} onChange={e => setDestination(e.target.value)} disabled={isLoadingInputs} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 outline-none disabled:bg-slate-50">
                 {hubs.map((h: any) => <option key={h.hub_id} value={h.hub_id}>{h.hub_name}</option>)}
               </select>
             </div>
 
             <div>
               <label className="text-[11px] font-bold text-slate-700 mb-1.5 block">Part / Item</label>
-              <select value={partNo} onChange={e => setPartNo(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 outline-none">
+              <select value={partNo} onChange={e => setPartNo(e.target.value)} disabled={isLoadingInputs} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 outline-none disabled:bg-slate-50">
                 {parts.map((p: any) => <option key={p.part_no} value={p.part_no}>{p.part_no} - {p.part_description}</option>)}
               </select>
             </div>
@@ -161,17 +176,14 @@ export default function AI_Route_Discovery() {
               </select>
             </div>
 
-            {/* Auto-Fill Card */}
-            <div className="rounded-xl border border-[#007A5E]/20 bg-[#007A5E]/5 p-4">
-              <div className="text-[11px] font-bold text-[#007A5E] mb-1">Auto-Fill from Recommendation Center</div>
-              <div className="text-[10px] text-slate-500 mb-3">Load details of a selected recommendation</div>
-              <button className="w-full py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-50">
-                <RefreshCw className="w-3 h-3" /> Select Recommendation
-              </button>
-            </div>
+            {message && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-bold text-amber-800 flex gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" /> {message}
+              </div>
+            )}
 
-            <button onClick={handleGenerate} className="w-full py-3 bg-[#007A5E] text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#00664d] transition shadow-sm">
-              <Zap className="w-4 h-4 fill-current" /> Generate AI Routes
+            <button onClick={handleGenerate} disabled={isGenerating || isLoadingInputs} className="w-full py-3 bg-[#007A5E] disabled:bg-slate-300 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#00664d] transition shadow-sm">
+              {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />} {isGenerating ? "Generating from Backend..." : "Generate AI Routes"}
             </button>
           </div>
 
@@ -179,17 +191,17 @@ export default function AI_Route_Discovery() {
             <div className="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-wider">Selected Load</div>
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">
-                <MapPin className="w-3 h-3 text-[#007A5E]" /> {hubs.find((h:any)=>h.hub_id===origin)?.hub_name || "Bangalore Hub"}
+                <MapPin className="w-3 h-3 text-[#007A5E]" /> {selectedOriginHub?.hub_name || "Select origin hub"}
               </div>
               <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">
-                <Flag className="w-3 h-3 text-[#007A5E]" /> {hubs.find((h:any)=>h.hub_id===destination)?.hub_name || "Delhi Hub"}
+                <Flag className="w-3 h-3 text-[#007A5E]" /> {selectedDestinationHub?.hub_name || "Select destination hub"}
               </div>
               <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">
-                <Search className="w-3 h-3 text-[#007A5E]" /> {partNo} - Compute Module
+                <Search className="w-3 h-3 text-[#007A5E]" /> {selectedPart ? `${selectedPart.part_no} - ${selectedPart.part_description}` : "Select part"}
               </div>
             </div>
             <div className="flex items-center gap-2 mt-4 text-[9px] font-semibold text-slate-400">
-              <CheckCircle2 className="w-3 h-3 text-green-500" /> AI models trained on 3+ years of historical data
+              <CheckCircle2 className="w-3 h-3 text-green-500" /> Inputs loaded from backend hubs and parts
             </div>
           </div>
         </div>
@@ -204,11 +216,20 @@ export default function AI_Route_Discovery() {
                 <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#007A5E]" /> Recommendations
                 </h2>
-                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Top 3 AI-recommended routes ranked by your optimization preferences</p>
+                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Backend route intelligence ranks available routes for the selected load</p>
               </div>
-              <div className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">Last updated: Just now</div>
+              <div className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">
+                Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Not generated"}
+              </div>
             </div>
 
+            {routes.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+                <Sparkles className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+                <div className="text-sm font-black text-slate-700">{isGenerating ? "Generating route recommendations..." : "No route recommendation generated yet"}</div>
+                <div className="mt-1 text-xs font-semibold text-slate-500">Choose backend hubs and part, then generate routes.</div>
+              </div>
+            ) : (
             <div className="grid grid-cols-3 gap-4">
               {[
                 { title: "Recommended Route", accent: "green", tag: "Best Overall", color: "#10B981" },
@@ -218,7 +239,7 @@ export default function AI_Route_Discovery() {
                 const r = routes[idx];
                 const isActive = selectedRouteIndex === idx;
                 return (
-                  <div key={idx} onClick={() => r && setSelectedRouteIndex(idx)} className={`rounded-xl border-2 ${isActive ? 'border-[#10B981]' : 'border-slate-100'} p-4 cursor-pointer hover:border-[#10B981] transition relative`}>
+                  <div key={idx} onClick={() => r && setSelectedRouteIndex(idx)} className={`rounded-xl border-2 ${isActive ? 'border-[#10B981]' : 'border-slate-100'} ${r ? "cursor-pointer hover:border-[#10B981]" : "opacity-60"} p-4 transition relative`}>
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-1.5">
                         <div className="w-4 h-4 rounded-full flex items-center justify-center text-white" style={{backgroundColor: card.color}}>
@@ -232,15 +253,15 @@ export default function AI_Route_Discovery() {
                     <div className="grid grid-cols-3 gap-2 mb-4">
                       <div>
                         <div className="text-[10px] font-bold text-slate-400">ETA</div>
-                        <div className="text-[14px] font-black text-slate-900">{r ? r.total_transit_days.toFixed(1) : "-"} <span className="text-[10px]">Days</span></div>
+                        <div className="text-[14px] font-black text-slate-900">{r ? r.total_transit_days.toFixed(1) : "--"} <span className="text-[10px]">Days</span></div>
                       </div>
                       <div>
                         <div className="text-[10px] font-bold text-slate-400">Cost</div>
-                        <div className="text-[14px] font-black text-slate-900">${r ? r.total_cost.toLocaleString('en-US', {maximumFractionDigits:0}) : "-"}</div>
+                        <div className="text-[14px] font-black text-slate-900">{r ? `$${r.total_cost.toLocaleString('en-US', {maximumFractionDigits:0})}` : "--"}</div>
                       </div>
                       <div>
                         <div className="text-[10px] font-bold text-slate-400">CO2</div>
-                        <div className="text-[14px] font-black text-slate-900">{r ? (r.total_distance_km*0.19*quantity).toFixed(0) : "-"} <span className="text-[10px]">kg</span></div>
+                        <div className="text-[14px] font-black text-slate-900">{r ? (r.total_distance_km*0.19*quantity).toFixed(0) : "--"} <span className="text-[10px]">kg</span></div>
                       </div>
                     </div>
 
@@ -256,16 +277,17 @@ export default function AI_Route_Discovery() {
                     </div>
 
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600 pt-3 border-t border-slate-100">
-                      <span>{r ? r.total_distance_km.toFixed(0) : 0} km</span>
+                      <span>{r ? r.total_distance_km.toFixed(0) : "--"} km</span>
                       <div className="w-1 h-1 rounded-full bg-slate-300" />
-                      <span>{r ? r.path.length : 0} Hubs</span>
+                      <span>{r ? r.path.length : "--"} Hubs</span>
                       <div className="w-1 h-1 rounded-full bg-slate-300" />
-                      <span>On-time: {r ? r.sla_success_rate.toFixed(0) : 0}%</span>
+                      <span>On-time: {r ? r.sla_success_rate.toFixed(0) : "--"}%</span>
                     </div>
                   </div>
                 )
               })}
             </div>
+            )}
           </div>
 
           {/* Middle Row: Route Comparison Graph */}
@@ -283,9 +305,9 @@ export default function AI_Route_Discovery() {
                   <text x="20" y="-10" className="text-[9px] fill-slate-500 font-bold">Total Cost</text>
                   <text x="20" y="0" className="text-[9px] fill-slate-500">(USD)</text>
                   
-                  {[1, 1.5, 2, 2.5, 3, 3.5].map((v, i) => (
+                  {(routes.length ? [0, 1, 2, 3, 4, 5].map((step) => costAxisMin + ((costAxisMax - costAxisMin) / 5) * step) : []).map((v, i) => (
                     <g key={i}>
-                      <text x="25" y={195 - (i * 38)} className="text-[9px] fill-slate-400 text-right" textAnchor="end">{v}k</text>
+                      <text x="25" y={195 - (i * 38)} className="text-[9px] fill-slate-400 text-right" textAnchor="end">{Math.round(v / 100) / 10}k</text>
                       <line x1="30" y1={190 - (i * 38)} x2="280" y2={190 - (i * 38)} stroke="#F1F5F9" strokeWidth="1" />
                     </g>
                   ))}
@@ -293,19 +315,21 @@ export default function AI_Route_Discovery() {
                   <line x1="30" y1="190" x2="280" y2="190" stroke="#CBD5E1" strokeWidth="2" />
                   
                   {/* X Axis: ETA */}
-                  {[3, 4, 5, 6, 7].map((v, i) => (
-                    <text key={i} x={30 + (i * 50)} y="205" className="text-[9px] fill-slate-400" textAnchor="middle">{v}</text>
+                  {(routes.length ? [0, 1, 2, 3, 4].map((step) => etaAxisMin + ((etaAxisMax - etaAxisMin) / 4) * step) : []).map((v, i) => (
+                    <text key={i} x={30 + (i * 50)} y="205" className="text-[9px] fill-slate-400" textAnchor="middle">{v.toFixed(1)}</text>
                   ))}
                   <text x="155" y="220" className="text-[9px] fill-slate-500 font-bold" textAnchor="middle">ETA (Days)</text>
+
+                  {routes.length === 0 && (
+                    <text x="155" y="100" className="text-[11px] fill-slate-400 font-bold" textAnchor="middle">Generate routes to plot backend results</text>
+                  )}
 
                   {/* Lines & Dots for the 3 routes mapped from data */}
                   {routes.map((r, i) => {
                      const color = i === 0 ? "#10B981" : i === 1 ? "#3B82F6" : "#F97316";
                      
-                     // Y Axis: 1000 to 3500 (maps to 190 to 0)
-                     const getY = (val: number) => 190 - ((Math.max(1000, Math.min(3500, val)) - 1000) / 2500) * 190;
-                     // X Axis: 3 to 7 (maps to 30 to 230)
-                     const getX = (val: number) => 30 + ((Math.max(3, Math.min(7, val)) - 3) / 4) * 200;
+                     const getY = (val: number) => 190 - ((Math.max(costAxisMin, Math.min(costAxisMax, val)) - costAxisMin) / Math.max(1, costAxisMax - costAxisMin)) * 190;
+                     const getX = (val: number) => 30 + ((Math.max(etaAxisMin, Math.min(etaAxisMax, val)) - etaAxisMin) / Math.max(1, etaAxisMax - etaAxisMin)) * 200;
                      
                      const x = getX(r.total_transit_days);
                      const y = getY(r.total_cost);
@@ -350,17 +374,17 @@ export default function AI_Route_Discovery() {
                <div className="flex items-center gap-3 mb-4">
                  <h2 className="text-sm font-black text-slate-900">Route Preview & Metrics</h2>
                  <span className="text-[10px] font-bold text-slate-400">(for selected route)</span>
-                 <span className="px-2 py-0.5 rounded-full bg-[#10B981]/10 text-[#10B981] text-[10px] font-bold ml-2">Recommended Route</span>
+                 {selectedRoute && <span className="px-2 py-0.5 rounded-full bg-[#10B981]/10 text-[#10B981] text-[10px] font-bold ml-2">{routeLabel}</span>}
                </div>
                
                <div className="grid grid-cols-6 gap-3">
                  {[
-                   { label: "ETA", icon: Clock, val: selectedRoute?.total_transit_days.toFixed(1) || "-", unit: "Days", sub: "Fastest", color: "text-[#10B981]" },
-                   { label: "Total Cost", icon: Zap, val: selectedRoute ? `$${selectedRoute.total_cost.toLocaleString('en-US', {maximumFractionDigits:0})}` : "-", unit: "", sub: "Lowest", color: "text-[#10B981]" },
-                   { label: "Distance", icon: Navigation, val: selectedRoute?.total_distance_km.toLocaleString('en-US', {maximumFractionDigits:0}) || "-", unit: "km", sub: "Optimal", color: "text-[#10B981]" },
-                   { label: "CO2 Emission", icon: MapPin, val: selectedRoute ? (selectedRoute.total_distance_km*0.19*quantity).toFixed(0) : "-", unit: "kg", sub: "Lowest", color: "text-[#10B981]" },
-                   { label: "SLA Reliability", icon: ShieldCheck, val: selectedRoute?.sla_success_rate.toFixed(0) || "-", unit: "%", sub: "Excellent", color: "text-[#10B981]" },
-                   { label: "Confidence Score", icon: CheckCircle2, val: selectedRoute ? Math.round(selectedRoute.confidence_score).toString() : "-", unit: "%", sub: "Very High", color: "text-[#10B981]" }
+                   { label: "ETA", icon: Clock, val: selectedRoute?.total_transit_days.toFixed(1) || "--", unit: "Days", sub: selectedRoute ? "Backend estimate" : "No route", color: "text-[#10B981]" },
+                   { label: "Total Cost", icon: Zap, val: selectedRoute ? `$${selectedRoute.total_cost.toLocaleString('en-US', {maximumFractionDigits:0})}` : "--", unit: "", sub: selectedRoute ? "Backend scored" : "No route", color: "text-[#10B981]" },
+                   { label: "Distance", icon: Navigation, val: selectedRoute?.total_distance_km.toLocaleString('en-US', {maximumFractionDigits:0}) || "--", unit: "km", sub: selectedRoute ? `${selectedRoute.path.length} hubs` : "No route", color: "text-[#10B981]" },
+                   { label: "CO2 Emission", icon: MapPin, val: selectedRoute ? (selectedRoute.total_distance_km*0.19*quantity).toFixed(0) : "--", unit: "kg", sub: selectedRoute ? "Distance based" : "No route", color: "text-[#10B981]" },
+                   { label: "SLA Reliability", icon: ShieldCheck, val: selectedRoute?.sla_success_rate.toFixed(0) || "--", unit: "%", sub: selectedRoute ? "Backend probability" : "No route", color: "text-[#10B981]" },
+                   { label: "Confidence Score", icon: CheckCircle2, val: selectedRoute ? Math.round(selectedRoute.confidence_score).toString() : "--", unit: "%", sub: selectedRoute ? "Model confidence" : "No route", color: "text-[#10B981]" }
                  ].map((stat, i) => (
                    <div key={i} className="border border-slate-100 rounded-xl p-3 bg-white shadow-sm flex flex-col justify-between">
                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#007A5E] mb-2">
@@ -375,13 +399,13 @@ export default function AI_Route_Discovery() {
                </div>
             </div>
 
-            {/* Live Route Simulation Widget */}
+            {/* Route replay widget */}
             <div className="w-[300px] shrink-0 bg-[#0F2922] rounded-xl p-4 flex flex-col justify-between text-white relative overflow-hidden">
                <div className="flex items-center justify-between mb-4 z-10 relative">
-                 <div className="text-[12px] font-bold">Live Route Simulation</div>
+                 <div className="text-[12px] font-bold">Route Replay</div>
                  <div className="flex items-center gap-1.5 bg-[#10B981]/20 px-2 py-1 rounded-full border border-[#10B981]/30">
-                   <div className="w-1.5 h-1.5 bg-[#10B981] rounded-full animate-pulse" />
-                   <span className="text-[9px] font-bold text-[#10B981]">Live</span>
+                   <div className="w-1.5 h-1.5 bg-[#10B981] rounded-full" />
+                   <span className="text-[9px] font-bold text-[#10B981]">{selectedRoute ? "Backend Route" : "Waiting"}</span>
                  </div>
                </div>
 
@@ -404,13 +428,13 @@ export default function AI_Route_Discovery() {
                    <div className="flex flex-col items-center">
                      <div className={`w-2.5 h-2.5 rounded-full ${simulationStep >= 1 ? 'bg-[#10B981]' : 'bg-white/20'} border-2 border-[#0F2922] -mt-7 z-10 transition-colors duration-500`} />
                      <span className="text-[8px] font-bold text-white/80 mt-4">Departed</span>
-                     <span className="text-[9px] font-bold text-white">{hubs.find((h:any)=>h.hub_id===origin)?.hub_name?.split(' ')[0] || "Origin"}</span>
+                   <span className="text-[9px] font-bold text-white">{selectedOriginHub?.hub_name?.split(' ')[0] || "Origin"}</span>
                    </div>
                    
                    <div className="flex flex-col items-center">
                      <div className={`w-2.5 h-2.5 rounded-full ${simulationStep >= 2 ? 'bg-[#10B981]' : 'bg-white/20'} border-2 border-[#0F2922] -mt-7 z-10 transition-colors duration-500`} />
                      <span className="text-[8px] font-bold text-white/80 mt-4">In Transit</span>
-                     <span className="text-[9px] font-bold text-white">{selectedRoute ? selectedRoute.path.length : 0} Hubs</span>
+                     <span className="text-[9px] font-bold text-white">{selectedRoute ? selectedRoute.path.length : "--"} Hubs</span>
                    </div>
                    
                    <div className="flex flex-col items-center">
@@ -422,20 +446,15 @@ export default function AI_Route_Discovery() {
                    <div className="flex flex-col items-center text-right">
                      <div className={`w-2.5 h-2.5 rounded-full ${simulationStep >= 3 ? 'bg-[#10B981]' : 'bg-white/20'} border-2 border-[#0F2922] -mt-7 z-10 flex items-center justify-center text-white transition-colors duration-500`}><Flag className="w-2 h-2" /></div>
                      <span className="text-[8px] font-bold text-white/80 mt-4">ETA at Dest</span>
-                     <span className="text-[9px] font-bold text-[#10B981]">{selectedRoute?.total_transit_days.toFixed(1)} Days</span>
+                     <span className="text-[9px] font-bold text-[#10B981]">{selectedRoute ? `${selectedRoute.total_transit_days.toFixed(1)} Days` : "--"}</span>
                    </div>
                  </div>
                </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 py-4 mt-auto">
-             <button className="px-6 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 flex items-center gap-2 shadow-sm hover:bg-slate-50">
-               <Zap className="w-4 h-4 text-[#10B981]" /> Explain AI Decision
-             </button>
-             <button className="px-6 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 flex items-center gap-2 shadow-sm hover:bg-slate-50">
-               <RotateCcw className="w-4 h-4 text-[#F97316]" /> Simulate Disruption
-             </button>
+          <div className="flex items-center justify-center gap-4 py-4 mt-auto text-xs font-semibold text-slate-500">
+            {selectedRoute ? "Route metrics are generated from the backend route intelligence service." : "Generate a route to unlock backend metrics and replay."}
           </div>
         </div>
       </div>

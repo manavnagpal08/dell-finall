@@ -4,6 +4,7 @@ from backend.optimization.services.reverse_optimization import reverse_optimizat
 from backend.optimization.services.inventory_optimization import inventory_optimization_engine
 from backend.optimization.services.hub_optimization import hub_optimization_engine
 from backend.optimization.services.consolidation import consolidation_engine
+from backend.optimization.services.demand_positioning import demand_positioning_engine
 
 from backend.optimization.schemas.optimization import (
     OptimizationDashboardData,
@@ -44,6 +45,10 @@ class OpportunityService:
             db, region=region, part_category=part_category, priority=priority,
             hub_id=hub_id, tpr_id=tpr_id, flow_type=flow_type
         )
+        dp_data = demand_positioning_engine.optimize(
+            db, region=region, part_category=part_category, priority=priority,
+            hub_id=hub_id, tpr_id=tpr_id, flow_type=flow_type
+        )
 
         # 1. Gather all KPIs
         kpis = []
@@ -52,6 +57,7 @@ class OpportunityService:
         kpis.extend(inv_data.metrics)
         kpis.extend(hub_data.metrics)
         kpis.extend(cons_data.metrics)
+        kpis.extend(dp_data.metrics)
 
         # 2. Gather all recommendations and opportunities
         recommendations = []
@@ -60,6 +66,7 @@ class OpportunityService:
         recommendations.extend(inv_data.recommendations[:2])
         recommendations.extend(hub_data.recommendations[:2])
         recommendations.extend(cons_data.recommendations[:2])
+        recommendations.extend(dp_data.recommendations[:2])
 
         opportunities = []
         opportunities.extend(cost_data.opportunities[:2])
@@ -67,6 +74,7 @@ class OpportunityService:
         opportunities.extend(inv_data.opportunities[:2])
         opportunities.extend(hub_data.opportunities[:2])
         opportunities.extend(cons_data.opportunities[:2])
+        opportunities.extend(dp_data.opportunities[:2])
 
         # 3. Compile regional and category savings splits
         regional_savings = {

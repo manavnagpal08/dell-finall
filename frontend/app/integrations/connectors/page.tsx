@@ -43,13 +43,32 @@ const connectorTemplates = [
 
 const categoryOrder = ["ERP", "Logistics", "Files", "APIs", "Databases", "Cloud"]
 
-const fallbackActive: any[] = []
-
 const capabilityCards: { title: string; detail: string; icon: LucideIcon }[] = [
   { title: "Credential Vault", detail: "Connection forms keep secrets masked and ready for environment-backed storage.", icon: ShieldCheck },
   { title: "Schema Mapping", detail: "Every connector opens a field mapping workspace for operations-ready data.", icon: Database },
   { title: "Operational Events", detail: "Webhooks and scheduled sync jobs feed dashboards, alerts, and reports.", icon: Webhook }
 ]
+
+const iconByType: Record<string, LucideIcon> = {
+  sap: Server,
+  oracle_erp: Server,
+  netsuite: Server,
+  tms: Activity,
+  wms: Database,
+  ims: Database,
+  excel: FileSpreadsheet,
+  csv: FileSpreadsheet,
+  sftp: Cloud,
+  api: Plug,
+  webhook: Webhook,
+  postgres: Database,
+  sqlserver: Database,
+  s3: Cloud,
+}
+
+const connectorDescriptions: Record<string, string> = Object.fromEntries(
+  connectorTemplates.map((item) => [item.id, item.desc])
+)
 
 function statusBadge(status: string) {
   if (status === "connected") return <Badge variant="success">Connected</Badge>
@@ -58,7 +77,7 @@ function statusBadge(status: string) {
 }
 
 export default function ConnectorsPage() {
-  const [activeConnectors, setActiveConnectors] = useState<any[]>(fallbackActive)
+  const [activeConnectors, setActiveConnectors] = useState<any[]>([])
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState("All")
   const [syncingId, setSyncingId] = useState("")
@@ -68,34 +87,55 @@ export default function ConnectorsPage() {
     apiClient.get("/integrations/connectors")
       .then((res) => res.data || [])
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) setActiveConnectors(data)
+        setActiveConnectors(Array.isArray(data) ? data : [])
       })
       .catch(() => {
-        setActiveConnectors(fallbackActive)
+        setActiveConnectors([])
       })
   }, [])
 
   const templates = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    return connectorTemplates
-      .map((template) => {
-        const active = activeConnectors.find((connector) => connector.id === template.id || connector.type === template.id || connector.type === template.type)
-        const isVerified = active?.status === "connected" && (active?.verified_at || active?.credentials_configured === true)
-        return { ...template, status: isVerified ? "connected" : template.status }
-      })
+    return activeConnectors
+      .map((connector) => ({
+        id: connector.id,
+        name: connector.name,
+        category: connector.category || "Files",
+        type: connector.type,
+        icon: iconByType[connector.type] || Plug,
+        status: connector.status || "available",
+        cadence: connector.cadence || "Manual",
+        entities: (connector.entities || []) as string[],
+        desc: connectorDescriptions[connector.id] || `Persisted ${connector.name} connector managed by the backend integration service.`,
+        endpoint: connector.endpoint,
+        authType: connector.auth_type,
+      }))
       .filter((template) => category === "All" || template.category === category)
       .filter((template) => !normalized || `${template.name} ${template.desc} ${template.entities.join(" ")}`.toLowerCase().includes(normalized))
   }, [activeConnectors, category, query])
 
   const connectedCount = templates.filter((template) => template.status === "connected").length
+  const mappingQuality = templates.length
+    ? Math.round(
+        templates.reduce((sum, template) => sum + (template.endpoint && template.authType && template.entities.length ? 100 : template.endpoint ? 60 : 0), 0) / templates.length
+      )
+    : 0
 
   const runSync = (id: string, name: string) => {
     setSyncingId(id)
     setMessage("")
-    window.setTimeout(() => {
-      setSyncingId("")
-      setMessage(`${name} sync completed. Data is ready for validation and route decisions.`)
-    }, 800)
+    apiClient.post(`/integrations/connectors/${id}/sync`)
+      .then((res) => {
+        setMessage(res.data?.message || `${name} sync completed against the active operations dataset.`)
+        return apiClient.get("/integrations/connectors")
+      })
+      .then((res) => {
+        if (Array.isArray(res.data)) setActiveConnectors(res.data)
+      })
+      .catch(() => {
+        setMessage(`${name} sync could not be verified by the backend. Check connector readiness before using it for route decisions.`)
+      })
+      .finally(() => setSyncingId(""))
   }
 
   return (
@@ -122,7 +162,7 @@ export default function ConnectorsPage() {
                 <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ready Templates</div>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div className="text-2xl font-black text-slate-950">98%</div>
+                <div className="text-2xl font-black text-slate-950">{mappingQuality}%</div>
                 <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">Mapping Quality</div>
               </div>
             </div>

@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { NetworkNode, NetworkLink } from "@/types"
-import { Layers, ChevronDown, ChevronUp, Play, Pause } from "lucide-react"
+import { Layers, ChevronDown, ChevronUp, Play, Pause, AlertTriangle } from "lucide-react"
+import { useGetRiskOverlay } from "@/services/queries"
 
 interface LeafletMapProps {
   nodes: NetworkNode[]
@@ -88,7 +89,10 @@ export default function LeafletMap({
   const linesLayer = useRef<L.LayerGroup | null>(null)
   const heatLayer = useRef<L.LayerGroup | null>(null)
   const simulationLayer = useRef<L.LayerGroup | null>(null)
+  const riskLayer = useRef<L.LayerGroup | null>(null)
   const [isPlaying, setIsPlaying] = useState(true)
+
+  const { data: riskEvents } = useGetRiskOverlay()
 
   // Filter nodes/links based on layerState
   const visibleNodes = nodes.filter(n => {
@@ -177,6 +181,7 @@ export default function LeafletMap({
       heatLayer.current = L.layerGroup().addTo(mapInstance.current)
       markersLayer.current = L.layerGroup().addTo(mapInstance.current)
       simulationLayer.current = L.layerGroup().addTo(mapInstance.current)
+      riskLayer.current = L.layerGroup().addTo(mapInstance.current)
     }
 
     const map = mapInstance.current
@@ -187,6 +192,9 @@ export default function LeafletMap({
     markers.clearLayers()
     lines.clearLayers()
     heat.clearLayers()
+    
+    // Risk Layer drawing happens in a separate effect
+
 
     const activeHeatLayer = layerState?.heatmaps?.active && layerState.heatmaps.active !== "none"
       ? layerState.heatmaps.active
@@ -343,7 +351,7 @@ export default function LeafletMap({
         onSelectLink(link)
       })
 
-      let riskInfo = link.sla_breach_rate > 50 ? `<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 font-medium text-xs">⚠️ High Risk Corridor</div>` : ""
+      let riskInfo = link.sla_breach_rate > 50 ? `<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 font-medium text-xs">High Risk Corridor</div>` : ""
 
       polyline.bindTooltip(
         `<div class="p-3 space-y-1.5 text-xs select-none min-w-[200px] bg-white rounded-xl border border-slate-100 shadow-xl font-sans text-slate-800">
@@ -400,9 +408,9 @@ export default function LeafletMap({
       let aiIconHtml = '';
       if (layerState?.ai?.xrayMode) {
         if (node.utilisation > 0.85) {
-          aiIconHtml = `<div class="absolute -top-1 -right-1 text-[10px] bg-red-500 text-white w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-sm z-20">⚠</div>`;
+          aiIconHtml = `<div class="absolute -top-1 -right-1 text-[10px] bg-red-500 text-white w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-sm z-20">!</div>`;
         } else if (node.inbound_shipments_count > 15) {
-          aiIconHtml = `<div class="absolute -top-1 -right-1 text-[10px] bg-purple-500 text-white w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-sm z-20">📈</div>`;
+          aiIconHtml = `<div class="absolute -top-1 -right-1 text-[10px] bg-purple-500 text-white w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-sm z-20">+</div>`;
         }
       }
 
@@ -542,6 +550,89 @@ export default function LeafletMap({
 
     return () => clearInterval(tick)
   }, [visibleLinks, isPlaying, layerState])
+
+  // Risk Overlay Rendering
+  useEffect(() => {
+    if (!riskLayer.current || !riskEvents) return
+    const layer = riskLayer.current
+    layer.clearLayers()
+
+    // Draw risk zones (e.g. from GDACS or Weather)
+    riskEvents.forEach(risk => {
+      const isCritical = risk.severity === 'Critical'
+      const color = isCritical ? '#DC2626' : risk.severity === 'High' ? '#F97316' : '#F59E0B'
+      
+      // Pulse animation marker
+      const html = `<div class="relative flex items-center justify-center h-12 w-12">
+        <div class="absolute h-full w-full rounded-full animate-ping" style="background-color: ${color}; opacity: 0.3"></div>
+        <div class="relative z-10 flex items-center justify-center h-8 w-8 rounded-full border border-white shadow-lg" style="background-color: ${color};">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+      </div>`
+      
+      const customIcon = L.divIcon({
+        className: "risk-marker",
+        html,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24]
+      })
+
+      const marker = L.marker([risk.latitude, risk.longitude], { icon: customIcon })
+      
+      marker.bindTooltip(
+        `<div class="p-3 w-64 bg-white rounded-xl shadow-2xl border border-red-100 text-sm font-sans">
+          <div class="font-bold flex items-center gap-2 border-b border-slate-100 pb-2 mb-2 text-slate-900">
+            <span class="px-2 py-0.5 rounded text-[10px] uppercase font-black tracking-wider text-white" style="background-color: ${color}">${risk.severity}</span>
+            <span class="truncate">${risk.title}</span>
+          </div>
+          <div class="text-xs text-slate-600 mb-3">${risk.description || 'Live alert'}</div>
+          
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="bg-slate-50 p-2 rounded border border-slate-100 text-center">
+              <div class="text-[10px] text-slate-400 font-bold uppercase">Shipments</div>
+              <div class="text-lg font-black text-slate-800">${risk.affected_shipments_count}</div>
+            </div>
+            <div class="bg-slate-50 p-2 rounded border border-slate-100 text-center">
+              <div class="text-[10px] text-slate-400 font-bold uppercase">Hubs</div>
+              <div class="text-lg font-black text-slate-800">${risk.affected_hubs.length}</div>
+            </div>
+          </div>
+          
+          <div class="bg-blue-50 border border-blue-100 text-blue-800 p-2 text-xs rounded font-medium">
+            <div class="font-bold mb-1">AI Recommendation:</div>
+            ${risk.recommended_action}
+          </div>
+        </div>`,
+        { direction: "top", offset: [0, -20], opacity: 1, className: "custom-tooltip" }
+      )
+      
+      marker.addTo(layer)
+
+      // Add a huge semi-transparent radius circle
+      L.circle([risk.latitude, risk.longitude], {
+        radius: risk.radius_km * 1000,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.05,
+        weight: 1,
+        dashArray: "4, 6",
+        interactive: false
+      }).addTo(layer)
+      
+      // Draw warning lines to affected hubs
+      visibleNodes.forEach(hub => {
+        if (risk.affected_hubs.includes(hub.name)) {
+          L.polyline([[risk.latitude, risk.longitude], [hub.latitude, hub.longitude]], {
+            color: color,
+            weight: 2,
+            dashArray: "4, 8",
+            opacity: 0.5,
+            interactive: false
+          }).addTo(layer)
+        }
+      })
+    })
+  }, [riskEvents, visibleNodes])
 
   return (
     <div className="h-full w-full relative bg-slate-50 overflow-hidden" style={{ zIndex: 0 }}>

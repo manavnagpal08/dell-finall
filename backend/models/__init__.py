@@ -20,6 +20,7 @@ from backend.models.optimization_db import (
     RedeploymentPlan,
     ConsolidationReport
 )
+from backend.models.integration import IntegrationConnector, IntegrationSyncJob, IntegrationAuditLog
 
 __all__ = [
     "Base", 
@@ -39,7 +40,8 @@ __all__ = [
     "RepairCenterMetric",
     "StockoutPrediction",
     "RedeploymentPlan",
-    "ConsolidationReport"
+    "ConsolidationReport",
+    "IntegrationConnector",
+    "IntegrationSyncJob",
+    "IntegrationAuditLog",
 ]
-
-

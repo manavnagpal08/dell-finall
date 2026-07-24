@@ -135,6 +135,14 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
     return () => { document.head.removeChild(style); };
   }, []);
 
+  const formatUsd = (value: number) => `$${Math.round(value || 0).toLocaleString()}`;
+  const formatDays = (value: number) => `${Number(value || 0).toFixed(1)} Days`;
+  const currentCarbon = Math.round(data.costAnalysis.currentRouteCost * 0.18);
+  const recommendedCarbon = Math.max(0, Math.round(data.costAnalysis.recommendedCost * 0.18));
+  const carbonReduction = Math.max(0, currentCarbon - recommendedCarbon);
+  const currentRouteHops = Math.max(2, data.caseOverview.routeId.split("-").filter(Boolean).length);
+  const recommendedRouteHops = Math.max(1, currentRouteHops - (data.alternatives.length > 0 ? 1 : 0));
+
   return (
     <div className="flex overflow-x-auto pb-6 pt-2 px-2 no-scrollbar -mx-4 items-center h-full snap-x snap-mandatory">
       
@@ -148,19 +156,19 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
           <>
             <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-slate-100 shadow-sm">
               <span className="text-[#6B7280] text-[11px] font-semibold">Current Cost</span>
-              <span className="text-slate-900 text-[13px] font-bold line-through">$420</span>
+              <span className="text-slate-900 text-[13px] font-bold line-through">{formatUsd(data.costAnalysis.currentRouteCost)}</span>
             </div>
             <div className="flex justify-between items-center bg-blue-50/50 rounded-lg p-2 border border-blue-100">
               <span className="text-blue-700 text-[11px] font-bold">AI Recommendation</span>
-              <span className="text-blue-600 text-[15px] font-black">$352</span>
+              <span className="text-blue-600 text-[15px] font-black">{formatUsd(data.costAnalysis.recommendedCost)}</span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-[#6B7280] text-[11px] font-semibold">Total Savings</span>
-              <span className="text-blue-600 text-[13px] font-bold">$68</span>
+              <span className="text-blue-600 text-[13px] font-bold">{formatUsd(data.costAnalysis.savings)}</span>
             </div>
             <div className="mt-auto bg-blue-50 rounded-lg p-3 border border-blue-100">
               <p className="text-blue-800 text-[10px] font-bold uppercase tracking-wider mb-1">AI Reason</p>
-              <p className="text-blue-700 text-[12px] font-medium leading-tight">Historical route performed <strong>17.6% better</strong> in similar demand conditions.</p>
+              <p className="text-blue-700 text-[12px] font-medium leading-tight">Backend scored this option at <strong>{data.savingsPercentage.toFixed(1)}%</strong> cost improvement.</p>
             </div>
           </>
         }
@@ -176,19 +184,19 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
           <>
             <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-slate-100 shadow-sm">
               <span className="text-[#6B7280] text-[11px] font-semibold">Historical ETA</span>
-              <span className="text-slate-900 text-[13px] font-bold">5.4 Days</span>
+              <span className="text-slate-900 text-[13px] font-bold">{formatDays(data.transitAnalysis.currentETA)}</span>
             </div>
             <div className="flex justify-between items-center bg-cyan-50/50 rounded-lg p-2 border border-cyan-100">
               <span className="text-cyan-700 text-[11px] font-bold">Predicted ETA</span>
-              <span className="text-cyan-600 text-[15px] font-black">3.8 Days</span>
+              <span className="text-cyan-600 text-[15px] font-black">{formatDays(data.transitAnalysis.recommendedETA)}</span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-[#6B7280] text-[11px] font-semibold">Confidence Score</span>
-              <span className="text-cyan-600 text-[13px] font-bold">97%</span>
+              <span className="text-cyan-600 text-[13px] font-bold">{data.confidencePercentage.toFixed(1)}%</span>
             </div>
             <div className="mt-auto bg-cyan-50 rounded-lg p-3 border border-cyan-100">
               <p className="text-cyan-800 text-[10px] font-bold uppercase tracking-wider mb-1">AI Reason</p>
-              <p className="text-cyan-700 text-[12px] font-medium leading-tight">Bypassing congested hub saves 1.6 days of predictable delay.</p>
+              <p className="text-cyan-700 text-[12px] font-medium leading-tight">Backend transit model projects {data.etaImprovementDays.toFixed(1)} days saved for this recommendation.</p>
             </div>
           </>
         }
@@ -204,19 +212,19 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
           <>
             <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-slate-100 shadow-sm">
               <span className="text-[#6B7280] text-[11px] font-semibold">Origin Stock</span>
-              <span className="text-slate-900 text-[13px] font-bold">142 Units</span>
+              <span className="text-slate-900 text-[13px] font-bold">{data.inventoryImpact.originStock} Units</span>
             </div>
             <div className="flex justify-between items-center bg-purple-50/50 rounded-lg p-2 border border-purple-100">
               <span className="text-purple-700 text-[11px] font-bold">Projected Demand</span>
-              <span className="text-purple-600 text-[15px] font-black">24 Units</span>
+              <span className="text-purple-600 text-[15px] font-black">{data.inventoryImpact.destinationDemand} Units</span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-[#6B7280] text-[11px] font-semibold">Network Balance</span>
-              <span className="text-purple-600 text-[13px] font-bold">Healthy</span>
+              <span className="text-purple-600 text-[13px] font-bold">{data.inventoryImpact.overallImpact}</span>
             </div>
             <div className="mt-auto bg-purple-50 rounded-lg p-3 border border-purple-100">
               <p className="text-purple-800 text-[10px] font-bold uppercase tracking-wider mb-1">AI Reason</p>
-              <p className="text-purple-700 text-[12px] font-medium leading-tight">Stock allocation does not cause regional shortages.</p>
+              <p className="text-purple-700 text-[12px] font-medium leading-tight">{data.inventoryImpact.originStatus}; {data.inventoryImpact.destinationStatus}.</p>
             </div>
           </>
         }
@@ -227,24 +235,24 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
         id="carbon" title="Carbon Impact" icon={Leaf} color="#22C55E"
         isActive={activeCard === "carbon"} isFlipped={!!flippedCards["carbon"]}
         onHover={handleHover} onClick={() => handleCardClick("carbon")}
-        frontContent={<p className="text-[#6B7280] text-[13px] leading-relaxed">Environmental impact and CO₂ savings</p>}
+        frontContent={<p className="text-[#6B7280] text-[13px] leading-relaxed">Environmental impact and CO2 savings</p>}
         backContent={
           <>
             <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-slate-100 shadow-sm">
-              <span className="text-[#6B7280] text-[11px] font-semibold">Current CO₂</span>
-              <span className="text-slate-900 text-[13px] font-bold">82 kg</span>
+              <span className="text-[#6B7280] text-[11px] font-semibold">Current CO2</span>
+              <span className="text-slate-900 text-[13px] font-bold">{currentCarbon} kg</span>
             </div>
             <div className="flex justify-between items-center bg-green-50/50 rounded-lg p-2 border border-green-100">
               <span className="text-green-700 text-[11px] font-bold">Recommended</span>
-              <span className="text-green-600 text-[15px] font-black">61 kg</span>
+              <span className="text-green-600 text-[15px] font-black">{recommendedCarbon} kg</span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-[#6B7280] text-[11px] font-semibold">Total Reduction</span>
-              <span className="text-green-600 text-[13px] font-bold">21 kg</span>
+              <span className="text-green-600 text-[13px] font-bold">{carbonReduction} kg</span>
             </div>
             <div className="mt-auto bg-green-50 rounded-lg p-3 border border-green-100">
               <p className="text-green-800 text-[10px] font-bold uppercase tracking-wider mb-1">AI Reason</p>
-              <p className="text-green-700 text-[12px] font-medium leading-tight">Consolidated routing utilizes lower emission carriers.</p>
+              <p className="text-green-700 text-[12px] font-medium leading-tight">Estimated from backend current and recommended route cost for this decision context.</p>
             </div>
           </>
         }
@@ -260,19 +268,19 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
           <>
             <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-slate-100 shadow-sm">
               <span className="text-[#6B7280] text-[11px] font-semibold">Risk Probability</span>
-              <span className="text-slate-900 text-[13px] font-bold">Low (12%)</span>
+              <span className="text-slate-900 text-[13px] font-bold">{data.riskSLA.predictedRisk.toFixed(1)}%</span>
             </div>
             <div className="flex justify-between items-center bg-orange-50/50 rounded-lg p-2 border border-orange-100">
               <span className="text-orange-700 text-[11px] font-bold">Success Likelihood</span>
-              <span className="text-orange-600 text-[15px] font-black">98.5%</span>
+              <span className="text-orange-600 text-[15px] font-black">{data.riskSLA.slaAchievementProb.toFixed(1)}%</span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-[#6B7280] text-[11px] font-semibold">Model Confidence</span>
-              <span className="text-orange-600 text-[13px] font-bold">Very High</span>
+              <span className="text-orange-600 text-[13px] font-bold">{data.confidencePercentage.toFixed(1)}%</span>
             </div>
             <div className="mt-auto bg-orange-50 rounded-lg p-3 border border-orange-100">
               <p className="text-orange-800 text-[10px] font-bold uppercase tracking-wider mb-1">AI Reason</p>
-              <p className="text-orange-700 text-[12px] font-medium leading-tight">Route has historically handled similar demand spikes gracefully.</p>
+              <p className="text-orange-700 text-[12px] font-medium leading-tight">{data.riskSLA.riskFactors[0] || "Backend risk model returned no blocking factors."}</p>
             </div>
           </>
         }
@@ -288,19 +296,19 @@ export function FlipCardsManager({ data, activeCard, onCardActivate }: { data: D
           <>
             <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-slate-100 shadow-sm">
               <span className="text-[#6B7280] text-[11px] font-semibold">Route Hops</span>
-              <span className="text-slate-900 text-[13px] font-bold">Reduced by 1</span>
+              <span className="text-slate-900 text-[13px] font-bold">{currentRouteHops} to {recommendedRouteHops}</span>
             </div>
             <div className="flex justify-between items-center bg-teal-50/50 rounded-lg p-2 border border-teal-100">
               <span className="text-teal-700 text-[11px] font-bold">Network Utilization</span>
-              <span className="text-teal-600 text-[15px] font-black">Optimal</span>
+              <span className="text-teal-600 text-[15px] font-black">{data.graphState.hubCapacity}</span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-[#6B7280] text-[11px] font-semibold">Pareto Efficiency</span>
-              <span className="text-teal-600 text-[13px] font-bold">Top 5%</span>
+              <span className="text-teal-600 text-[13px] font-bold">{data.recommendationScore.toFixed(1)} Score</span>
             </div>
             <div className="mt-auto bg-teal-50 rounded-lg p-3 border border-teal-100">
               <p className="text-teal-800 text-[10px] font-bold uppercase tracking-wider mb-1">AI Reason</p>
-              <p className="text-teal-700 text-[12px] font-medium leading-tight">Balances overall network load across satellite hubs.</p>
+              <p className="text-teal-700 text-[12px] font-medium leading-tight">{data.graphState.route} route decision for {data.caseOverview.origin} to {data.caseOverview.destination}.</p>
             </div>
           </>
         }

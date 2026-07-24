@@ -19,7 +19,13 @@ frontend/.env.local
 
 # Logs
 *.log
+*.err
 frontend/dev-server.log
+
+# Local scratch and repaired metadata backups
+scratch/
+.git-broken-empty/
+test_dp.py
 
 # Local generated data and model artifacts
 *.db

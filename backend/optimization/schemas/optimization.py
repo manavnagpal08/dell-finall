@@ -65,3 +65,9 @@ class ConsolidationData(BaseModel):
     opportunities: List[OpportunityCard]
     recommendations: List[ExecutiveRecommendation]
     savings_by_part_category: Dict[str, float]
+
+class DemandPositioningData(BaseModel):
+    metrics: List[OptimizationMetric]
+    opportunities: List[OpportunityCard]
+    recommendations: List[ExecutiveRecommendation]
+    waste_cost_by_city: Dict[str, float]

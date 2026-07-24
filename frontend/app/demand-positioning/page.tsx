@@ -7,26 +7,16 @@ import {
   BarChart2,
   CheckCircle2,
   Download,
-  FileText,
   Filter,
-  Loader2,
   RefreshCw,
   ShieldCheck,
-  TrendingDown,
   Zap,
 } from "lucide-react";
-import {
-  useGetConsolidationOpportunities,
-  useGetCostOptimization,
-  useGetHubOptimization,
-  useGetInventoryOptimization,
-  useGetOptimizationDashboard,
-  useGetReverseOptimization,
-} from "@/services/queries";
+import { useGetDemandPositioning } from "@/services/queries";
 import type { ExecutiveRecommendation, OpportunityCard, OptimizationMetric } from "@/types";
 
 type FlowFilter = "" | "Forward" | "Reverse" | "Part Buy";
-type WorkspaceTab = "Cost Leakage" | "Savings Breakdown" | "Suboptimal Transactions" | "Cost Suggestions" | "Reinvestment Advisor";
+type WorkspaceTab = "Waste Leakage" | "Cost Breakdown" | "Suboptimal Routing" | "Stock Suggestions";
 
 const flowOptions: { label: string; value: FlowFilter }[] = [
   { label: "All Flows", value: "" },
@@ -48,71 +38,38 @@ const severityStyle: Record<string, string> = {
   Low: "bg-emerald-50 text-emerald-700 border-emerald-100",
 };
 
-function metricByName(metrics: OptimizationMetric[], name: string) {
-  return metrics.find((metric) => metric.name === name);
-}
-
 function pickMetric(metrics: OptimizationMetric[], index: number) {
   return metrics[index] || metrics[0];
 }
 
-export default function CostOptimizationCenter() {
+export default function DemandPositioningCenter() {
   const [flowType, setFlowType] = useState<FlowFilter>("");
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("Cost Leakage");
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("Waste Leakage");
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
   const filters = useMemo(() => ({ flow_type: flowType || undefined }), [flowType]);
 
-  const dashboardQuery = useGetOptimizationDashboard(filters);
-  const costQuery = useGetCostOptimization(filters);
-  const reverseQuery = useGetReverseOptimization(filters);
-  const inventoryQuery = useGetInventoryOptimization(filters);
-  const hubQuery = useGetHubOptimization(filters);
-  const consolidationQuery = useGetConsolidationOpportunities(filters);
+  const dpQuery = useGetDemandPositioning(filters);
 
-  const queries = [dashboardQuery, costQuery, reverseQuery, inventoryQuery, hubQuery, consolidationQuery];
-  const isLoading = queries.some((query) => query.isLoading);
-  const isFetching = queries.some((query) => query.isFetching);
-  const hasError = queries.some((query) => query.isError);
-  const lastUpdated = queries.map((query) => query.dataUpdatedAt).filter(Boolean).sort((a, b) => b - a)[0];
+  const isLoading = dpQuery.isLoading;
+  const isFetching = dpQuery.isFetching;
+  const hasError = dpQuery.isError;
+  const lastUpdated = dpQuery.dataUpdatedAt;
 
-  const dashboard = dashboardQuery.data;
-  const allMetrics = dashboard?.kpis || [];
-  const allOpportunities = useMemo(
-    () => [
-      ...(costQuery.data?.opportunities || []),
-      ...(reverseQuery.data?.opportunities || []),
-      ...(inventoryQuery.data?.opportunities || []),
-      ...(hubQuery.data?.opportunities || []),
-      ...(consolidationQuery.data?.opportunities || []),
-    ],
-    [costQuery.data, reverseQuery.data, inventoryQuery.data, hubQuery.data, consolidationQuery.data]
-  );
-  const allRecommendations = useMemo(
-    () => [
-      ...(costQuery.data?.recommendations || []),
-      ...(reverseQuery.data?.recommendations || []),
-      ...(inventoryQuery.data?.recommendations || []),
-      ...(hubQuery.data?.recommendations || []),
-      ...(consolidationQuery.data?.recommendations || []),
-    ],
-    [costQuery.data, reverseQuery.data, inventoryQuery.data, hubQuery.data, consolidationQuery.data]
-  );
+  const allMetrics = dpQuery.data?.metrics || [];
+  const allOpportunities = dpQuery.data?.opportunities || [];
+  const allRecommendations = dpQuery.data?.recommendations || [];
+  const wasteCostByCity = dpQuery.data?.waste_cost_by_city || {};
 
   const selectedOpportunity = allOpportunities.find((item) => item.id === selectedOpportunityId) || allOpportunities[0] || null;
   const totalCurrent = allMetrics.reduce((sum, metric) => sum + metric.current_value, 0);
   const totalOptimized = allMetrics.reduce((sum, metric) => sum + metric.optimized_value, 0);
   const totalSavings = allMetrics.reduce((sum, metric) => sum + metric.savings_value, 0);
   const avgImprovement = allMetrics.length ? allMetrics.reduce((sum, metric) => sum + metric.improvement_pct, 0) / allMetrics.length : 0;
-  const categorySavings = dashboard?.category_savings || {};
-  const regionalSavings = dashboard?.regional_savings || {};
-  const maxCategory = Math.max(...Object.values(categorySavings), 1);
-  const maxRegion = Math.max(...Object.values(regionalSavings), 1);
-  const currentScore = dashboard?.optimization_score_current || 0;
-  const projectedScore = dashboard?.optimization_score_projected || 0;
-  const scoreLift = Math.max(0, projectedScore - currentScore);
+  
+  const maxCityWaste = Math.max(...Object.values(wasteCostByCity), 1);
 
   const refreshAll = () => {
-    queries.forEach((query) => query.refetch());
+    dpQuery.refetch();
   };
 
   const exportCsv = () => {
@@ -124,7 +81,7 @@ export default function CostOptimizationCenter() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "cost-optimization-opportunities.csv";
+    link.download = "demand-positioning-opportunities.csv";
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -134,13 +91,13 @@ export default function CostOptimizationCenter() {
       <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-white border-b border-slate-200">
         <div>
           <h1 className="text-xl font-black text-[#0F2922] flex items-center gap-2">
-            Cost Optimization Center
+            Predictive Demand Positioning
             <span className="text-[10px] font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-full border border-[#10B981]/20 flex items-center gap-1">
               <Zap className="w-3 h-3" /> Backend Scored
             </span>
           </h1>
           <p className="text-xs text-slate-500 font-semibold mt-1">
-            Transport, reverse, inventory, hub load, and consolidation savings from the optimization API.
+            Analyze historical cross-city stockouts and optimize local inventory placement.
           </p>
         </div>
 
@@ -165,17 +122,16 @@ export default function CostOptimizationCenter() {
       <div className="flex-1 p-6 space-y-6">
         {hasError && (
           <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" /> Some optimization APIs are unavailable. Loaded sections show backend data only; missing sections remain empty.
+            <AlertCircle className="h-4 w-4" /> The demand positioning API is unavailable.
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
           {[
-            { label: "Total Current Cost", value: formatUsd(totalCurrent), sub: `${allMetrics.length} backend metrics`, icon: DollarSignCard },
-            { label: "Optimized Cost", value: formatUsd(totalOptimized), sub: `${formatPct(avgImprovement)} average improvement`, icon: BarChart2 },
+            { label: "Waste Current Cost", value: formatUsd(totalCurrent), sub: `${allMetrics.length} backend metrics`, icon: DollarSignCard },
             { label: "Potential Savings", value: formatUsd(totalSavings), sub: `${allOpportunities.length} opportunities`, icon: Activity },
-            { label: "Optimization Score", value: `${currentScore.toFixed(1)} -> ${projectedScore.toFixed(1)}`, sub: `${scoreLift.toFixed(1)} point lift`, icon: ShieldCheck },
-            { label: "Recommendations", value: `${allRecommendations.length}`, sub: "backend actions", icon: CheckCircle2 },
+            { label: "Average Improvement", value: formatPct(avgImprovement), sub: `from backend actions`, icon: ShieldCheck },
+            { label: "Recommendations", value: `${allRecommendations.length}`, sub: "ready to inject", icon: CheckCircle2 },
           ].map((kpi) => (
             <div key={kpi.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-2 flex items-center gap-2 text-[11px] font-bold text-slate-500">
@@ -194,8 +150,8 @@ export default function CostOptimizationCenter() {
           <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-base font-black text-slate-900">Optimization Opportunities</h2>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">Ranked directly from backend optimization engines.</p>
+                <h2 className="text-base font-black text-slate-900">Demand Optimization Opportunities</h2>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">Stock injections ranked by cross-city SLA breaches and freight waste.</p>
               </div>
               <div className="text-[10px] font-bold text-slate-400">
                 Updated: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "waiting"}
@@ -237,7 +193,7 @@ export default function CostOptimizationCenter() {
                   })}
                   {!isLoading && allOpportunities.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-10 text-center text-sm font-bold text-slate-400">No optimization opportunities returned by the backend.</td>
+                      <td colSpan={5} className="py-10 text-center text-sm font-bold text-slate-400">No cross-city stockouts detected by the backend.</td>
                     </tr>
                   )}
                 </tbody>
@@ -246,7 +202,7 @@ export default function CostOptimizationCenter() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-black text-slate-900">Selected Opportunity</h2>
+            <h2 className="text-base font-black text-slate-900">Selected Action</h2>
             {selectedOpportunity ? (
               <div className="mt-4 space-y-4">
                 <div>
@@ -255,13 +211,13 @@ export default function CostOptimizationCenter() {
                 </div>
                 <p className="text-sm font-semibold leading-6 text-slate-600">{selectedOpportunity.description}</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <MetricTile label="Expected Saving" value={formatUsd(selectedOpportunity.cost_saving)} />
+                  <MetricTile label="Waste Prevention" value={formatUsd(selectedOpportunity.cost_saving)} />
                   <MetricTile label="Severity" value={selectedOpportunity.severity} />
                 </div>
               </div>
             ) : (
               <div className="mt-10 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-bold text-slate-400">
-                Select an opportunity to inspect its backend evidence.
+                Select an opportunity to inspect its details.
               </div>
             )}
           </div>
@@ -270,12 +226,12 @@ export default function CostOptimizationCenter() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
-              <h2 className="text-base font-black text-slate-900">AI Analysis Workspace</h2>
-              <p className="text-[10px] font-semibold text-slate-500">All tabs use the loaded optimization API responses.</p>
+              <h2 className="text-base font-black text-slate-900">AI Deep Dive</h2>
+              <p className="text-[10px] font-semibold text-slate-500">Analyze the raw data grouped by destination.</p>
             </div>
 
             <div className="mb-5 flex gap-2 overflow-x-auto pb-2">
-              {(["Cost Leakage", "Savings Breakdown", "Suboptimal Transactions", "Cost Suggestions", "Reinvestment Advisor"] as WorkspaceTab[]).map((tab) => (
+              {(["Waste Leakage", "Stock Suggestions"] as WorkspaceTab[]).map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`whitespace-nowrap rounded-lg border px-4 py-2 text-[11px] font-bold transition-colors ${activeTab === tab ? "border-[#10B981] bg-[#10B981]/10 text-[#10B981]" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
                   {tab}
                 </button>
@@ -287,32 +243,17 @@ export default function CostOptimizationCenter() {
               selectedOpportunity={selectedOpportunity}
               metrics={allMetrics}
               recommendations={allRecommendations}
-              categorySavings={categorySavings}
-              regionalSavings={regionalSavings}
-              maxCategory={maxCategory}
-              maxRegion={maxRegion}
             />
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900">Savings Distribution</h2>
+            <h2 className="text-sm font-black text-slate-900">Waste Cost by City</h2>
             <div className="mt-5 space-y-4">
-              {Object.entries(categorySavings).map(([label, value]) => (
-                <Bar key={label} label={label} value={value} max={maxCategory} />
+              {Object.entries(wasteCostByCity).map(([label, value]) => (
+                <Bar key={label} label={label} value={value as number} max={maxCityWaste} />
               ))}
-              {!Object.keys(categorySavings).length && <EmptyState text="No category savings returned by the backend." />}
+              {!Object.keys(wasteCostByCity).length && <EmptyState text="No city waste data returned." />}
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-slate-600">
-            <ShieldCheck className="h-4 w-4 text-[#10B981]" />
-            <span>{allMetrics.length} optimization metrics loaded</span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span>{allOpportunities.length} opportunities identified</span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span className="text-[#10B981]">Total potential savings: {formatUsd(totalSavings)}</span>
           </div>
         </div>
       </div>
@@ -338,21 +279,13 @@ function WorkspaceContent({
   selectedOpportunity,
   metrics,
   recommendations,
-  categorySavings,
-  regionalSavings,
-  maxCategory,
-  maxRegion,
 }: {
   activeTab: WorkspaceTab;
   selectedOpportunity: OpportunityCard | null;
   metrics: OptimizationMetric[];
   recommendations: ExecutiveRecommendation[];
-  categorySavings: Record<string, number>;
-  regionalSavings: Record<string, number>;
-  maxCategory: number;
-  maxRegion: number;
 }) {
-  if (activeTab === "Cost Leakage") {
+  if (activeTab === "Waste Leakage") {
     return (
       <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
         {selectedOpportunity ? (
@@ -369,47 +302,7 @@ function WorkspaceContent({
     );
   }
 
-  if (activeTab === "Savings Breakdown") {
-    return (
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-          <h3 className="mb-4 text-sm font-black text-slate-800">Category Savings</h3>
-          <div className="space-y-3">
-            {Object.entries(categorySavings).map(([label, value]) => <Bar key={label} label={label} value={value} max={maxCategory} />)}
-            {!Object.keys(categorySavings).length && <EmptyState text="No category savings returned." />}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-          <h3 className="mb-4 text-sm font-black text-slate-800">Regional Savings</h3>
-          <div className="space-y-3">
-            {Object.entries(regionalSavings).map(([label, value]) => <Bar key={label} label={label} value={value} max={maxRegion} />)}
-            {!Object.keys(regionalSavings).length && <EmptyState text="No regional savings returned." />}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (activeTab === "Suboptimal Transactions") {
-    return (
-      <div className="space-y-3">
-        {metrics.map((metric) => (
-          <div key={metric.name} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-sm font-black text-slate-900">{metric.name}</div>
-                <div className="mt-1 text-[11px] font-semibold text-slate-500">{formatPct(metric.improvement_pct)} improvement from backend analysis</div>
-              </div>
-              <div className="text-right text-sm font-black text-[#10B981]">{formatUsd(metric.savings_value)}</div>
-            </div>
-          </div>
-        ))}
-        {!metrics.length && <EmptyState text="No backend metrics returned." />}
-      </div>
-    );
-  }
-
-  if (activeTab === "Cost Suggestions") {
+  if (activeTab === "Stock Suggestions") {
     return (
       <div className="space-y-3">
         {recommendations.map((rec) => (
@@ -429,24 +322,7 @@ function WorkspaceContent({
     );
   }
 
-  const bestMetric = pickMetric(metrics, 0);
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-      {bestMetric ? (
-        <>
-          <h3 className="text-sm font-black text-slate-900">Reinvestment Advisor</h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-            The largest loaded optimization metric is {bestMetric.name}. The backend projects {formatUsd(bestMetric.savings_value)} in savings after optimization.
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <MetricTile label="Current" value={formatUsd(bestMetric.current_value)} />
-            <MetricTile label="Optimized" value={formatUsd(bestMetric.optimized_value)} />
-            <MetricTile label="Improvement" value={formatPct(bestMetric.improvement_pct)} />
-          </div>
-        </>
-      ) : <EmptyState text="No metric available for reinvestment analysis." />}
-    </div>
-  );
+  return null;
 }
 
 function Bar({ label, value, max }: { label: string; value: number; max: number }) {

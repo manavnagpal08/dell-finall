@@ -19,8 +19,9 @@
   --shadow-premium-hover: 0 4px 12px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.02);
   --shadow-premium-card: 0 12px 24px -4px rgba(0, 0, 0, 0.01), 0 4px 12px -2px rgba(0, 0, 0, 0.01);
 
-  --font-sans: 'Segoe UI', Inter, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  --font-display: 'Segoe UI', Inter, system-ui, sans-serif;
+  --font-sans: Arial, 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: Arial, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: Arial, 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 
   --color-blue-50: #ECFDF5;
   --color-blue-100: #D1FAE5;
@@ -50,10 +51,32 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   font-family: var(--font-sans);
+  letter-spacing: 0;
 }
 
 .font-display {
   font-family: var(--font-display);
+}
+
+@layer utilities {
+  .font-black {
+    font-weight: 700;
+  }
+
+  .font-extrabold {
+    font-weight: 700;
+  }
+
+  .font-mono {
+    font-family: var(--font-sans);
+  }
+
+  .tracking-tight,
+  .tracking-wide,
+  .tracking-wider,
+  .tracking-widest {
+    letter-spacing: 0;
+  }
 }
 
 /* Custom Scrollbar for premium tables and scroll areas */

@@ -20,7 +20,7 @@ import { Suspense } from "react";
 function AIDecisionLabContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const id = searchParams.get("id") || "REC-4921";
+  const id = searchParams.get("id") || "latest";
   
   const [data, setData] = useState<DecisionLabData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -195,7 +195,7 @@ function AIDecisionLabContent() {
 
              {/* Evidence Panel */}
              <div className="xl:col-span-1">
-               <EvidencePanel />
+               <EvidencePanel data={data} />
              </div>
           </div>
         </div>
@@ -225,14 +225,16 @@ const formatUsd = (value?: number) =>
 const formatKg = (value?: number) =>
   `${Math.round(value || 0).toLocaleString()} kg`;
 
-function EvidencePanel() {
+function EvidencePanel({ data }: { data: DecisionLabData }) {
+  const primaryEvidence = data.evidenceSources[0];
+  const secondaryEvidence = data.evidenceSources[1];
   const rows = [
-    { label: "Similar Routes Analyzed", value: "1,248", icon: FileText, note: "Based on 1,248 historical routes" },
-    { label: "Historical Success Rate", value: "96%", icon: Activity, note: "Routes matching this pattern" },
-    { label: "Avg. Cost Performance", value: "$248 Saved", icon: DollarSign, note: "Compared to similar historical routes" },
-    { label: "Avg. Transit Performance", value: "40.1 Days Faster", icon: Clock, note: "Compared to similar historical routes" },
-    { label: "SLA Achievement (Historical)", value: "97%", icon: ShieldCheck, note: "On-time delivery in similar cases" },
-    { label: "Demand Pattern Match", value: "93%", icon: ShieldCheck, note: "High similarity with past demand behavior" },
+    { label: primaryEvidence?.title || "Backend Evidence", value: primaryEvidence?.records || data.id, icon: FileText, note: primaryEvidence?.status || "Loaded from decision context" },
+    { label: secondaryEvidence?.title || "Route Evidence", value: secondaryEvidence?.records || data.caseOverview.routeId, icon: Activity, note: secondaryEvidence?.status || "Route context available" },
+    { label: "Cost Improvement", value: formatUsd(data.costAnalysis.savings), icon: DollarSign, note: `${formatUsd(data.costAnalysis.currentRouteCost)} current vs ${formatUsd(data.costAnalysis.recommendedCost)} recommended` },
+    { label: "Transit Improvement", value: `${data.etaImprovementDays.toFixed(1)} Days`, icon: Clock, note: `${data.transitAnalysis.improvementPercent.toFixed(1)}% ETA improvement` },
+    { label: "SLA Achievement Probability", value: `${data.riskSLA.slaAchievementProb.toFixed(1)}%`, icon: ShieldCheck, note: `${data.slaRiskPercentage.toFixed(1)}% predicted risk` },
+    { label: "Inventory Impact", value: data.inventoryImpact.overallImpact, icon: ShieldCheck, note: `${data.inventoryImpact.originStock} units at origin, ${data.inventoryImpact.destinationDemand} units demand` },
   ];
 
   return (
@@ -272,7 +274,7 @@ function EvidencePanel() {
       </div>
       <div className="mt-4 rounded-xl bg-[#F0FDF4] p-3 text-[11px] font-semibold leading-5 text-[#166534] border border-[#DCFCE7] flex items-start gap-2 shadow-sm">
         <div className="mt-0.5 text-[#16A34A]"><Leaf size={14} /></div>
-        <p>AI models are trained on <strong>3+ years of historical data</strong> across global routes, hubs, and demand patterns.</p>
+        <p>Evidence is loaded from the backend decision context for route <strong>{data.caseOverview.routeId}</strong>, including transaction, route, inventory, and risk records.</p>
       </div>
     </div>
   );
@@ -342,7 +344,7 @@ function SupportingIntelligenceTabs({ data }: { data: any | null }) {
               {carbonRoutes.length ? carbonRoutes.map((item: any) => (
                 <div key={item.transaction_id} className="flex items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm">
                   <span className="font-bold text-slate-700 text-sm">{item.route?.join(" -> ")}</span>
-                  <span className="font-black text-[#047857] bg-green-50 px-3 py-1 rounded-full">{formatKg(item.carbon_kg)} CO₂</span>
+                  <span className="font-black text-[#047857] bg-green-50 px-3 py-1 rounded-full">{formatKg(item.carbon_kg)} CO2</span>
                 </div>
               )) : <p className="text-sm font-semibold text-slate-500">Loading carbon lanes...</p>}
             </div>
@@ -376,7 +378,7 @@ function SupportingIntelligenceTabs({ data }: { data: any | null }) {
               {inventory.length ? inventory.map((item: any) => (
                 <div key={`${item.hub_id}-${item.part_no}`} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-slate-100 px-4 py-3 last:border-0">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-slate-900">{item.part_no} · {item.hub_id}</p>
+                    <p className="truncate text-sm font-black text-slate-900">{item.part_no} / {item.hub_id}</p>
                     <p className="truncate text-xs font-medium text-slate-500 mt-1">{item.reason}</p>
                   </div>
                   <span className="text-xs font-black text-slate-700 bg-slate-100 px-2 py-1 rounded-md">{item.coverage_ratio}x Coverage</span>
@@ -399,7 +401,7 @@ function SupportingIntelligenceTabs({ data }: { data: any | null }) {
                       <p className="truncate text-sm font-black text-slate-900">{item.status}</p>
                       <span className="text-xs font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md">T+{item.minute}m</span>
                     </div>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{item.node} · {item.risk.toFixed(0)}% risk factor</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{item.node} / {item.risk.toFixed(0)}% risk factor</p>
                   </div>
                 </div>
               )) : <EmptyState text="Live route tracker loading..." />}

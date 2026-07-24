@@ -3,27 +3,27 @@
 import React, { useState, useEffect, useRef } from "react";
 import "leaflet/dist/leaflet.css";
 
-let L: any = null;
-if (typeof window !== "undefined") {
-  L = require("leaflet");
-}
-
 export function RouteMap({ routesToPlot, hubs }: any) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
+  const [leaflet, setLeaflet] = useState<any>(null);
   const [mapType, setMapType] = useState<"map" | "satellite">("map");
   const [projectedCoordsList, setProjectedCoordsList] = useState<any[][]>([]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !mapRef.current || mapInstance) return;
-    
-    const map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([20, 78], 4);
-    const layer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 });
-    layer.addTo(map);
-    
-    setMapInstance({ map, layer });
 
-    return () => { map.remove(); };
+    let map: any;
+    import("leaflet").then((L) => {
+      if (!mapRef.current) return;
+      map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([20, 78], 4);
+      const layer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 });
+      layer.addTo(map);
+      setLeaflet(L);
+      setMapInstance({ map, layer });
+    });
+
+    return () => { if (map) map.remove(); };
   }, [mapRef]);
 
   const updateProjected = React.useCallback(() => {
@@ -46,7 +46,7 @@ export function RouteMap({ routesToPlot, hubs }: any) {
   }, [mapInstance, routesToPlot, hubs]);
 
   useEffect(() => {
-    if (mapInstance?.map && routesToPlot && routesToPlot.length > 0) {
+    if (mapInstance?.map && leaflet && routesToPlot && routesToPlot.length > 0) {
       let allCoords: any[] = [];
       routesToPlot.forEach((r: any) => {
         const path = r.path ?? [];
@@ -57,7 +57,7 @@ export function RouteMap({ routesToPlot, hubs }: any) {
       });
 
       if (allCoords.length > 0) {
-        const bounds = L.latLngBounds(allCoords);
+        const bounds = leaflet.latLngBounds(allCoords);
         mapInstance.map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 6 });
         
         mapInstance.map.on('move', updateProjected);
@@ -73,7 +73,7 @@ export function RouteMap({ routesToPlot, hubs }: any) {
         mapInstance.map.off('zoom', updateProjected);
       }
     };
-  }, [mapInstance, routesToPlot]);
+  }, [mapInstance, leaflet, routesToPlot, hubs, updateProjected]);
 
   useEffect(() => {
     if (!mapInstance?.map) return;
@@ -108,9 +108,9 @@ export function RouteMap({ routesToPlot, hubs }: any) {
       </div>
 
       <div className="absolute top-4 right-4 z-20 flex flex-col bg-white rounded-lg shadow-sm border border-slate-200 pointer-events-auto">
-        <button className="w-8 h-8 flex items-center justify-center text-slate-600 font-bold border-b border-slate-100 hover:bg-slate-50">+</button>
-        <button className="w-8 h-8 flex items-center justify-center text-slate-600 font-bold border-b border-slate-100 hover:bg-slate-50">-</button>
-        <button className="w-8 h-8 flex items-center justify-center text-slate-600 font-bold hover:bg-slate-50">
+        <button onClick={() => mapInstance?.map?.zoomIn()} className="w-8 h-8 flex items-center justify-center text-slate-600 font-bold border-b border-slate-100 hover:bg-slate-50">+</button>
+        <button onClick={() => mapInstance?.map?.zoomOut()} className="w-8 h-8 flex items-center justify-center text-slate-600 font-bold border-b border-slate-100 hover:bg-slate-50">-</button>
+        <button onClick={() => updateProjected()} className="w-8 h-8 flex items-center justify-center text-slate-600 font-bold hover:bg-slate-50">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
         </button>
       </div>

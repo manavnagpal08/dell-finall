@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
-  ArrowLeft, BrainCircuit, CheckCircle2, ChevronRight, Activity, 
+  ArrowLeft, ArrowUpRight, BrainCircuit, CheckCircle2, ChevronRight, Activity, 
   Zap, ShieldCheck, Box, Clock, DollarSign, Target, Database,
   Route as RouteIcon, MapPin, Truck, AlertTriangle, PlayCircle, Lightbulb, 
   RefreshCw, Search, Settings, Check, Filter, Eye, X, CheckCircle,
@@ -482,9 +482,9 @@ export default function AIRecommendationCenter() {
 
           <div className="grid grid-cols-7 gap-4">
             {[
-              { label: "AI Recommendations", value: pendingQueue.length, sub: "Pending actions", color: "green", chart: true },
+              { label: "AI Recommendations", value: pendingQueue.length, sub: "Pending actions", color: "green" },
               { label: "High Impact", value: highImpactPending, sub: "From delayed shipments", color: "green", up: highImpactPending > 0 },
-              { label: "Total Potential Savings", value: totalSavings, prefix: "$", sub: "Across all recommendations", color: "green", large: true, sparkline: true },
+              { label: "Total Potential Savings", value: totalSavings, prefix: "$", sub: "Across all recommendations", color: "green", large: true },
               { label: "Avg Confidence", value: avgConfidence, suffix: "%", sub: queue.length ? "Backend scored" : "No queue", color: "green", circle: true },
               { label: "Implementation Rate", value: implementationRate, suffix: "%", sub: "Approved in this session", color: "gray" },
               { label: "Approved Today", value: approvedQueue.length, sub: `$${approvedSavings.toLocaleString()} Savings`, color: "green", icon: CheckCircle2 },
@@ -502,29 +502,13 @@ export default function AIRecommendationCenter() {
                       <AnimatedNumber value={kpi.value} prefix={kpi.prefix} suffix={kpi.suffix} />
                     </div>
                     <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
-                      {kpi.up && <span className="text-green-500">↑</span>}
+                      {kpi.up && <ArrowUpRight size={12} className="text-green-500" />}
                       {kpi.sub}
                     </div>
                   </div>
                   {kpi.circle && <CircularProgress value={kpi.value} color={C.green} size={36} stroke={4} />}
                 </div>
 
-                {kpi.chart && (
-                  <div className="absolute bottom-0 left-0 right-0 h-10 flex items-end px-4 opacity-50 gap-1 pb-2">
-                    {[3,6,4,8,5,9,7,10,8,6,7].map((h,j) => (
-                      <div key={j} className="flex-1 bg-green-200 rounded-t-sm" style={{height: `${h*10}%`}} />
-                    ))}
-                  </div>
-                )}
-                
-                {kpi.sparkline && (
-                  <div className="absolute bottom-0 right-0 left-0 h-16 opacity-30 pointer-events-none">
-                    <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="w-full h-full text-green-500 stroke-current" fill="none">
-                      <path d="M0,25 Q10,20 20,22 T40,15 T60,18 T80,5 T100,2" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M0,25 Q10,20 20,22 T40,15 T60,18 T80,5 T100,2 L100,30 L0,30 Z" className="fill-green-100" stroke="none" />
-                    </svg>
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -555,8 +539,11 @@ export default function AIRecommendationCenter() {
                       </button>
                     ))}
                   </div>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-600 hover:bg-gray-50">
-                    <Filter size={12} /> Filters
+                  <button
+                    onClick={() => setFilter(filter === "high" ? "all" : "high")}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-600 hover:bg-gray-50"
+                  >
+                    <Filter size={12} /> {filter === "high" ? "Show All" : "High Impact"}
                   </button>
                 </div>
               </div>
@@ -627,7 +614,7 @@ export default function AIRecommendationCenter() {
                           <X size={14}/> Reject
                         </button>
                         <Link 
-                           href={`/ai-investigation?id=${item.id}`}
+                           href={`/ai-decision-lab?id=${item.id}`}
                            onClick={(e) => e.stopPropagation()}
                            className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:bg-green-50 hover:text-green-700 hover:border-green-200 text-gray-600 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
                         >
@@ -920,7 +907,7 @@ export default function AIRecommendationCenter() {
                           <span className="text-[10px] text-red-400 mt-0.5">Choose alternative or dismiss</span>
                         </button>
                         <Link 
-                           href={`/ai-investigation?id=${selectedRec.id}`}
+                           href={`/ai-decision-lab?id=${selectedRec.id}`}
                            className="flex-1 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl py-3 flex flex-col items-center justify-center text-gray-700 transition-all hover:-translate-y-0.5 active:translate-y-0 hover:border-gray-300"
                         >
                           <span className="text-[13px] font-bold flex items-center gap-2"><Settings size={16}/> Modify in Decision Lab</span>

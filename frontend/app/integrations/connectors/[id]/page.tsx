@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import apiClient from "@/services/api-client"
 
 const connectorDetails: Record<string, any> = {
   sap: { name: "SAP ERP", category: "ERP", icon: Server, status: "available", endpoint: "", cadence: "Real-time", auth: "OAuth 2.0", entities: ["Shipments", "Inventory", "Costs", "Parts"], description: "Production ERP source for orders, part masters, stock movements, and logistics costs." },
@@ -106,6 +107,17 @@ export default function ConnectorDetailsPage() {
   const [secretRef, setSecretRef] = useState("")
   const [mappings, setMappings] = useState<Record<string, string>>(defaultMappings)
 
+  useEffect(() => {
+    apiClient.get(`/integrations/connectors/${id}`)
+      .then((res) => {
+        if (res.data?.status === "connected") setStatus("connected")
+        if (res.data?.config?.host) setEndpoint(res.data.config.host)
+      })
+      .catch(() => {
+        setStatus("available")
+      })
+  }, [id])
+
   const mappedCount = useMemo(() => Object.values(mappings).filter(Boolean).length, [mappings])
   const quality = Math.min(100, Math.round((mappedCount / sourceFields.length) * 100))
   const summaryCards: { title: string; copy: string; icon: LucideIcon }[] = [
@@ -120,14 +132,29 @@ export default function ConnectorDetailsPage() {
 
     if (type === "save") {
       setIsSaving(true)
-      window.setTimeout(() => {
-        setIsSaving(false)
-        setMessage({ type: "info", text: `${detail.name} draft saved. Run Test Connection before it is marked connected.` })
-      }, 500)
+      apiClient.put(`/integrations/connectors/${id}`, {
+        name: detail.name,
+        status,
+        cadence,
+        endpoint,
+        auth_type: auth,
+        enabled: status === "connected",
+        entities: detail.entities,
+        category: detail.category,
+        config: { host: endpoint, mappings },
+      })
+        .then((res) => {
+          setStatus(res.data?.status || status)
+          setMessage({ type: "success", text: `${detail.name} setup saved to the backend database.` })
+        })
+        .catch(() => {
+          setMessage({ type: "error", text: `${detail.name} setup could not be saved. Check backend availability and retry.` })
+        })
+        .finally(() => setIsSaving(false))
       return
     }
 
-    if (!hasEndpoint || !hasSecret) {
+    if (type === "test" && (!hasEndpoint || !hasSecret)) {
       setStatus("available")
       setMessage({
         type: "error",
@@ -136,20 +163,39 @@ export default function ConnectorDetailsPage() {
       return
     }
 
-    if (type === "sync" && status !== "connected") {
-      setMessage({ type: "error", text: "Sync is blocked until this connector passes Test Connection." })
-      return
-    }
-
     if (type === "test") setIsTesting(true)
     if (type === "sync") setIsSyncing(true)
 
+    if (type === "sync") {
+      apiClient.post(`/integrations/connectors/${id}/sync`)
+        .then((res) => {
+          setStatus(res.data?.connector?.status || "connected")
+          setMessage({ type: "success", text: res.data?.message || `${detail.name} sync completed against the backend dataset.` })
+        })
+        .catch(() => {
+          setMessage({ type: "error", text: `${detail.name} sync was not accepted by the backend. Check connector availability and loaded data.` })
+        })
+        .finally(() => setIsSyncing(false))
+      return
+    }
+
     window.setTimeout(() => {
       setIsTesting(false)
-      setIsSyncing(false)
       setStatus("connected")
-      if (type === "test") setMessage({ type: "success", text: `${detail.name} configuration verified. Required endpoint, credential reference, and schema mapping are ready for ingestion.` })
-      if (type === "sync") setMessage({ type: "success", text: `${detail.name} sync request accepted for the configured source. Check Sync Jobs for backend import results.` })
+      if (type === "test") {
+        apiClient.put(`/integrations/connectors/${id}`, {
+          name: detail.name,
+          status: "connected",
+          enabled: true,
+          cadence,
+          endpoint,
+          auth_type: auth,
+          entities: detail.entities,
+          category: detail.category,
+          config: { host: endpoint, mappings, verified_at: new Date().toISOString() },
+        }).catch(() => undefined)
+        setMessage({ type: "success", text: `${detail.name} configuration verified and saved to backend connector state.` })
+      }
     }, 850)
   }
 

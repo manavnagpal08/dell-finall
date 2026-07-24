@@ -184,6 +184,9 @@ def get_carbon_footprint_analysis(db: Session = Depends(get_db)):
     highest = max(ranked, key=lambda item: item[1])[0] if ranked else "N/A"
     savings = sum(item[1] * 0.12 for item in ranked if item[2] > 1600 or item[3] > 10)
     sustainability_score = max(0.0, min(100.0, 100.0 - (avg_co2 / 28.0)))
+    optimization_candidates = sum(1 for item in ranked if item[2] > 1600 or item[3] > 10)
+    estimated_fuel_saved_liters = savings * 0.38
+    estimated_cost_saved_usd = sum(item[2] * item[4] * 0.08 for item in ranked if item[2] > 1600 or item[3] > 10)
 
     return {
         "total_co2_kg": round(total_co2, 1),
@@ -192,4 +195,7 @@ def get_carbon_footprint_analysis(db: Session = Depends(get_db)):
         "highest_emission_corridor": highest,
         "carbon_savings_ytd_kg": round(savings, 1),
         "sustainability_score": round(sustainability_score, 1),
+        "optimization_candidates": optimization_candidates,
+        "estimated_fuel_saved_liters": round(estimated_fuel_saved_liters, 1),
+        "estimated_cost_saved_usd": round(estimated_cost_saved_usd, 2),
     }

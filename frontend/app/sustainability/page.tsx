@@ -14,6 +14,9 @@ type CarbonSummary = {
   highest_emission_corridor: string
   carbon_savings_ytd_kg: number
   sustainability_score: number
+  optimization_candidates: number
+  estimated_fuel_saved_liters: number
+  estimated_cost_saved_usd: number
 }
 
 function number(value: number, digits = 0) {
@@ -92,8 +95,8 @@ export default function SustainabilityPage() {
   const treeEquivalent = summary ? Math.round(summary.carbon_savings_ytd_kg / 21.8) : 0
   const routeCount = network?.links?.length || corridorRows.length
 
-  const costSavedEst = summary ? summary.carbon_savings_ytd_kg * 0.45 : 0; // Simple heuristic for cost savings estimation based on carbon
-  const optimizationsCount = Math.floor(totalShipments * 0.15); // Example: assume 15% were optimized
+  const costSaved = summary?.estimated_cost_saved_usd || 0
+  const optimizationsCount = summary?.optimization_candidates || 0
 
   return (
     <main className="min-h-screen bg-white font-sans text-slate-800 flex flex-col relative overflow-hidden">
@@ -158,8 +161,8 @@ export default function SustainabilityPage() {
             <SustainabilityOverview
               carbonSavedYtd={summary?.carbon_savings_ytd_kg || 0}
               optimizationsCount={optimizationsCount}
-              fuelSaved={(summary?.carbon_savings_ytd_kg || 0) * 0.38}
-              costSaved={costSavedEst}
+              fuelSaved={summary?.estimated_fuel_saved_liters || 0}
+              costSaved={costSaved}
               treesPlanted={treeEquivalent}
               carbonScore={summary?.sustainability_score || 0}
             />

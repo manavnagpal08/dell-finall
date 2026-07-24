@@ -356,6 +356,13 @@ export interface ConsolidationData {
   savings_by_part_category: Record<string, number>;
 }
 
+export interface DemandPositioningData {
+  metrics: OptimizationMetric[];
+  opportunities: OpportunityCard[];
+  recommendations: ExecutiveRecommendation[];
+  waste_cost_by_city: Record<string, number>;
+}
+
 // Predictive intelligence types
 export interface FeatureImportance {
   feature: string;
@@ -468,3 +475,19 @@ export interface Organization {
   region: string;
   contact_email: string;
 }
+
+export interface RiskEvent {
+  id: string;
+  title: string;
+  description: string;
+  risk_type: string;
+  severity: string;
+  latitude: number;
+  longitude: number;
+  radius_km: number;
+  affected_hubs: string[];
+  affected_shipments_count: number;
+  expected_impact_days: number;
+  recommended_action: string;
+}
+

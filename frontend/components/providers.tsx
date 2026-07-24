@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { createClient } from "@/utils/supabase/client"
+import { createClient, isSupabaseConfigured } from "@/utils/supabase/client"
 import { useAuthStore, UserRole } from "@/store/auth"
 
 function resolveRole(role: unknown): UserRole {
@@ -13,10 +13,15 @@ function resolveRole(role: unknown): UserRole {
 }
 
 function AuthSessionBridge({ children }: { children: React.ReactNode }) {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => (isSupabaseConfigured ? createClient() : null), [])
   const { setSession, setLoading } = useAuthStore()
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
+
     let mounted = true
     const finishWithoutSession = () => {
       if (!mounted) return

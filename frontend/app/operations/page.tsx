@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { useGetNetworkOverview, useGetHubs, useGetTPRs, useGetTransactions } from "@/services/queries";
 import { MapContainer } from "@/components/network/map-container";
 
@@ -38,7 +39,7 @@ const scoreLabel = (v: number) => (v >= 90 ? "Healthy" : v >= 75 ? "Stable" : v 
    BACKEND-DERIVED EXPLORER DATA
    ============================================================ */
 
-const getExplorerSections = (mode: string, hubs: any[] = [], tprs: any[] = [], transactions: any[] = []) => {
+const getExplorerSections = (mode: string, hubs: any[] = [], tprs: any[] = [], transactions: any[] = [], riskOnly = false) => {
   const formatHubs = hubs.map(h => ({
     ...h,
     id: h.hub_id,
@@ -55,25 +56,31 @@ const getExplorerSections = (mode: string, hubs: any[] = [], tprs: any[] = [], t
   }));
 
   const forwardTx = transactions.filter(t => t.flow_type !== "Reverse").map(t => ({
-    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} → ${t.destination_location}`
+    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} -> ${t.destination_location}`
   }));
 
   const reverseTx = transactions.filter(t => t.flow_type === "Reverse").map(t => ({
-    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} → ${t.destination_location}`
+    ...t, id: t.transaction_id, name: t.transaction_id, score: t.sla_breach ? 40 : 95, sub: `${t.origin_hub_id} -> ${t.destination_location}`
   }));
+
+  const keepRisk = (item: any) => !riskOnly || item.score < 60 || item.sla_breach || Number(item.utilisation_pct || 0) >= 0.85
+  const visibleHubs = formatHubs.filter(keepRisk)
+  const visibleTprs = formatTprs.filter(keepRisk)
+  const visibleForwardTx = forwardTx.filter(keepRisk)
+  const visibleReverseTx = reverseTx.filter(keepRisk)
 
   if (mode === "forward") {
     return [
-      { key: "hubs", label: "Hubs", icon: Warehouse, items: formatHubs },
-      { key: "shipments", label: "Shipments", icon: Truck, items: forwardTx },
-      { key: "repair", label: "Repair Centers", icon: Wrench, items: formatTprs },
-    ];
-  } else {
-    return [
-      { key: "repair", label: "Repair Centers", icon: Wrench, items: formatTprs },
-      { key: "shipments", label: "Reverse Shipments", icon: Truck, items: reverseTx },
+      { key: "hubs", label: "Hubs", icon: Warehouse, items: visibleHubs },
+      { key: "shipments", label: "Shipments", icon: Truck, items: visibleForwardTx },
+      { key: "repair", label: "Repair Centers", icon: Wrench, items: visibleTprs },
     ];
   }
+
+  return [
+    { key: "repair", label: "Repair Centers", icon: Wrench, items: visibleTprs },
+    { key: "shipments", label: "Reverse Shipments", icon: Truck, items: visibleReverseTx },
+  ];
 };
 
 
@@ -272,46 +279,29 @@ function Explorer({ mode, query, selected, onSelect, sections }: any) {
   );
 }
 
-/* ============================================================
-   TIME MACHINE
-   ============================================================ */
-const TIME_STEPS = ["Yesterday", "Today", "Tomorrow", "Next Week"];
-
-function TimeMachine(props: any) {
-  const { day, setDay } = props;
+function LiveDataStatus({ stats, filtered }: any) {
   return (
     <div className="bg-white rounded-2xl border p-4 shadow-sm" style={{ borderColor: C.gray200 }}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[13px] font-semibold" style={{ color: C.gray900 }}>Time Machine</span>
-        <span className="text-[11px]" style={{ color: C.gray400 }}>Drag to simulate operational state</span>
+        <span className="text-[13px] font-semibold" style={{ color: C.gray900 }}>Live Data Status</span>
+        <span className="text-[11px] font-bold rounded-full px-2 py-1" style={{ color: filtered ? C.amber : C.green, background: filtered ? "#FEF3C7" : C.greenSoft }}>
+          {filtered ? "Risk filter on" : "All objects"}
+        </span>
       </div>
-      <div className="relative px-1">
-        <div className="h-1.5 rounded-full" style={{ background: C.gray100 }}>
-          <div
-            className="h-1.5 rounded-full transition-all duration-500"
-            style={{ width: `${(day / (TIME_STEPS.length - 1)) * 100}%`, background: C.green }}
-          />
-        </div>
-        <input
-          type="range" min={0} max={TIME_STEPS.length - 1} step={1} value={day}
-          onChange={(e) => setDay(Number(e.target.value))}
-          className="absolute inset-0 w-full opacity-0 cursor-pointer"
-          style={{ height: 24, top: -10 }}
-        />
-        <div className="flex justify-between mt-2">
-          {TIME_STEPS.map((s, i) => (
-            <button key={s} onClick={() => setDay(i)} className="flex flex-col items-center gap-1" style={{ width: 64 }}>
-              <span
-                className="w-2.5 h-2.5 rounded-full transition-all"
-                style={{ background: i <= day ? C.green : C.gray200, transform: i === day ? "scale(1.3)" : "scale(1)" }}
-              />
-              <span className="text-[11px]" style={{ color: i === day ? C.gray900 : C.gray400, fontWeight: i === day ? 600 : 400 }}>{s}</span>
-            </button>
-          ))}
-        </div>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Objects", value: stats.objectsScanned },
+          { label: "Critical", value: stats.criticalIssues },
+          { label: "Warnings", value: stats.warnings },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl p-3" style={{ background: C.gray50 }}>
+            <div className="text-[10px]" style={{ color: C.gray500 }}>{item.label}</div>
+            <div className="text-base font-semibold mt-0.5" style={{ color: C.gray900 }}>{Number(item.value || 0).toLocaleString()}</div>
+          </div>
+        ))}
       </div>
     </div>
-  );
+  )
 }
 
 /* ============================================================
@@ -358,7 +348,7 @@ function buildObjectMetrics(object: any) {
   ]
 }
 
-function ObjectWorkspace({ object, section, day, onOpenAnalytics, onLocate }: any) {
+function ObjectWorkspace({ object, section, onOpenAnalytics, onLocate }: any) {
   if (!object) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center gap-3" style={{ color: C.gray400 }}>
@@ -385,7 +375,7 @@ function ObjectWorkspace({ object, section, day, onOpenAnalytics, onLocate }: an
                 {scoreLabel(object.score)}
               </span>
               <span className="text-xs" style={{ color: C.gray400 }}>{object.sub}</span>
-              <span className="text-xs" style={{ color: C.gray400 }}>· {section?.label}</span>
+              <span className="text-xs" style={{ color: C.gray400 }}>/ {section?.label}</span>
             </div>
           </div>
         </div>
@@ -396,9 +386,7 @@ function ObjectWorkspace({ object, section, day, onOpenAnalytics, onLocate }: an
           <button onClick={onOpenAnalytics} className="text-xs font-medium px-3 py-1.5 rounded-lg border flex items-center gap-1.5 hover:bg-gray-50" style={{ borderColor: C.gray200, color: C.gray700 }}>
             <BarChart3 size={14} /> Open Analytics
           </button>
-          <button className="text-xs font-medium px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5" style={{ background: C.gray900 }}>
-            View Details
-          </button>
+          <Link href={object.transaction_id ? `/transactions?search=${encodeURIComponent(object.transaction_id)}` : object.hub_id ? "/hubs" : object.tpr_id ? "/repairs" : "/operations"} className="text-xs font-medium px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5" style={{ background: C.gray900 }}>View Details</Link>
         </div>
       </div>
 
@@ -413,16 +401,6 @@ function ObjectWorkspace({ object, section, day, onOpenAnalytics, onLocate }: an
           </div>
         ))}
       </div>
-
-      <TimeMachineOwned day={day} />
-    </div>
-  );
-}
-
-function TimeMachineOwned({ day }: any) {
-  return (
-    <div className="text-[11px]" style={{ color: C.gray400 }}>
-      Values reflect <span style={{ color: C.gray700, fontWeight: 600 }}>{TIME_STEPS[day]}</span> — driven by the Time Machine above.
     </div>
   );
 }
@@ -786,7 +764,7 @@ function NetworkOverview({ mode, onSelect, selectedId, networkData }: any) {
 /* ============================================================
    RADAR SCAN STATUS (persistent, explorer footer)
    ============================================================ */
-function RadarStatus({ onScan }: any) {
+function RadarStatus({ onScan, lastScanLabel }: any) {
   return (
     <div className="mt-3 pt-3 border-t" style={{ borderColor: C.gray100 }}>
       <div className="flex items-center justify-between px-2 mb-2">
@@ -815,7 +793,7 @@ function RadarStatus({ onScan }: any) {
           </div>
         </div>
         <div className="text-center">
-          <div className="text-[11px] font-semibold" style={{ color: C.gray900 }}>Last scan: Today, 10:24 AM</div>
+          <div className="text-[11px] font-semibold" style={{ color: C.gray900 }}>Last scan: {lastScanLabel}</div>
           <div className="flex items-center justify-center gap-1 text-[10px] mt-0.5" style={{ color: C.green }}>
             <CheckCircle2 size={11} /> All systems operational
           </div>
@@ -863,7 +841,7 @@ function ScanModal({ onClose, stats }: any) {
             </div>
             <div>
               <div className="text-sm font-semibold" style={{ color: C.gray900 }}>Running Backend Network Scan</div>
-              <div className="text-xs mt-1" style={{ color: C.gray500 }}>{SCAN_STEPS[Math.min(step, SCAN_STEPS.length - 1)]}…</div>
+              <div className="text-xs mt-1" style={{ color: C.gray500 }}>{SCAN_STEPS[Math.min(step, SCAN_STEPS.length - 1)]}...</div>
             </div>
             <div className="w-full h-1.5 rounded-full" style={{ background: C.gray100 }}>
               <div className="h-1.5 rounded-full transition-all duration-300" style={{ width: `${(step / SCAN_STEPS.length) * 100}%`, background: C.green }} />
@@ -893,9 +871,7 @@ function ScanModal({ onClose, stats }: any) {
               <button onClick={onClose} className="flex-1 text-xs font-medium py-2.5 rounded-xl border" style={{ borderColor: C.gray200, color: C.gray700 }}>
                 Close
               </button>
-              <button onClick={onClose} className="flex-1 text-xs font-medium py-2.5 rounded-xl text-white" style={{ background: C.gray900 }}>
-                Open Investigation
-              </button>
+              <Link href="/ai-investigation" onClick={onClose} className="flex-1 text-center text-xs font-medium py-2.5 rounded-xl text-white" style={{ background: C.gray900 }}>Open Investigation</Link>
             </div>
           </div>
         )}
@@ -917,13 +893,15 @@ export default function OperationsIntelligenceCenter() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<any>(null);
   const [selectedSection, setSelectedSection] = useState<any>({ label: "Hubs" });
-  const [day, setDay] = useState(1);
   const [scanning, setScanning] = useState(false);
   const [refreshSpin, setRefreshSpin] = useState(false);
+  const [riskOnly, setRiskOnly] = useState(false);
+  const [workspaceNotice, setWorkspaceNotice] = useState("");
+  const [lastScanLabel, setLastScanLabel] = useState("Not run yet");
   const isLoadingData = hubsLoading || tprsLoading || txLoading;
   const hasDataError = hubsError || tprsError || txError;
 
-  const sections = getExplorerSections(mode, hubData?.items, tprData?.items, txData?.items);
+  const sections = getExplorerSections(mode, hubData?.items, tprData?.items, txData?.items, riskOnly);
   const scanStats = useMemo(() => {
     const hubs = hubData?.items || [];
     const tprs = tprData?.items || [];
@@ -973,6 +951,7 @@ export default function OperationsIntelligenceCenter() {
   const handleSelect = useCallback((obj: any, sec: any) => {
     setSelected(obj);
     setSelectedSection(sec || obj.__section);
+    setWorkspaceNotice("");
   }, []);
 
   const switchMode = (m: string) => {
@@ -981,6 +960,7 @@ export default function OperationsIntelligenceCenter() {
     setSelected(null);
     setSelectedSection({ label: m === "forward" ? "Hubs" : "Repair Centers" });
     setQuery("");
+    setWorkspaceNotice("");
   };
 
   const handleRefresh = () => {
@@ -989,7 +969,18 @@ export default function OperationsIntelligenceCenter() {
     refetchTprs();
     refetchTransactions();
     refetchNetwork();
+    setLastScanLabel(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     setTimeout(() => setRefreshSpin(false), 700);
+  };
+
+  const handleLocate = () => {
+    if (!selected) return;
+    setWorkspaceNotice(`${selected.name} is selected in the network overview. Use Map View or Flow View to inspect connected lanes.`);
+  };
+
+  const handleOpenAnalytics = () => {
+    if (!selected) return;
+    setWorkspaceNotice(`Analytics loaded from current backend metrics for ${selected.name}. Key health and cost indicators are shown in the workspace cards.`);
   };
 
   return (
@@ -1054,8 +1045,8 @@ export default function OperationsIntelligenceCenter() {
           <button onClick={handleRefresh} className="w-9 h-9 rounded-xl border flex items-center justify-center" style={{ borderColor: C.gray200 }}>
             <RefreshCw size={14} style={{ color: C.gray700, transition: "transform 0.7s", transform: refreshSpin ? "rotate(360deg)" : "rotate(0deg)" }} />
           </button>
-          <button className="w-9 h-9 rounded-xl border flex items-center justify-center" style={{ borderColor: C.gray200 }}>
-            <Filter size={14} style={{ color: C.gray700 }} />
+          <button onClick={() => setRiskOnly((value) => !value)} className="w-9 h-9 rounded-xl border flex items-center justify-center" style={{ borderColor: riskOnly ? C.amber : C.gray200, background: riskOnly ? "#FEF3C7" : "white" }} title={riskOnly ? "Show all objects" : "Show risk objects only"}>
+            <Filter size={14} style={{ color: riskOnly ? C.amber : C.gray700 }} />
           </button>
         </div>
       </div>
@@ -1103,7 +1094,7 @@ export default function OperationsIntelligenceCenter() {
               <Explorer mode={mode} query={query} selected={selected} onSelect={handleSelect} sections={sections} />
             )}
           </div>
-          <RadarStatus onScan={() => setScanning(true)} />
+          <RadarStatus onScan={() => { setLastScanLabel(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })); setScanning(true); }} lastScanLabel={lastScanLabel} />
         </div>
 
         {/* CENTER */}
@@ -1116,12 +1107,16 @@ export default function OperationsIntelligenceCenter() {
               <ObjectWorkspace
                 object={selected}
                 section={selectedSection}
-                day={day}
-                onOpenAnalytics={() => {}}
-                onLocate={() => {}}
+                onOpenAnalytics={handleOpenAnalytics}
+                onLocate={handleLocate}
               />
+              {workspaceNotice && (
+                <div className="mt-3 rounded-xl border px-3 py-2 text-[11px] font-semibold" style={{ borderColor: C.greenSoft, background: C.greenSoft, color: C.blue }}>
+                  {workspaceNotice}
+                </div>
+              )}
             </div>
-            <TimeMachine day={day} setDay={setDay} />
+            <LiveDataStatus stats={scanStats} filtered={riskOnly} />
           </div>
         </div>
       </div>

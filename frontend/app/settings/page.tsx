@@ -31,6 +31,8 @@ import { useOperationsStore } from "@/store/operations"
 import { useAuthStore } from "@/store/auth"
 
 type TabId = "data" | "users" | "health" | "organization" | "security" | "audit"
+type SettingsUser = { id: number; email: string; role: string; status: string; lastActive: string }
+type SettingsAuditRow = { time: string; actor: string; action: string; resource: string; outcome: string }
 
 const tabs: Array<{ id: TabId; name: string; icon: React.ElementType; description: string }> = [
   { id: "data", name: "Data Pipeline", icon: Database, description: "Workbook, connectors, and baselines" },
@@ -94,21 +96,8 @@ export default function SettingsPage() {
   )
   const [activeTab, setActiveTab] = useState<TabId>("data")
   const [settingsStatus, setSettingsStatus] = useState("")
-  const [users, setUsers] = useState([
-    { id: 1, email: "operations.admin@sanchar.ai", role: "Admin", status: "Active", lastActive: "Just now" },
-    { id: 2, email: "manager@sanchar.ai", role: "Operations Manager", status: "Active", lastActive: "15m ago" },
-    { id: 3, email: "analyst@sanchar.ai", role: "Logistics Analyst", status: "Active", lastActive: "2h ago" },
-    { id: 4, email: "viewer@sanchar.ai", role: "Viewer", status: "Inactive", lastActive: "3 days ago" }
-  ])
-  const [adminAuditRows, setAdminAuditRows] = useState([
-    {
-      time: new Date().toISOString(),
-      actor: user?.email ?? "operations.admin@sanchar.ai",
-      action: "ADMIN_PAGE_MERGED",
-      resource: "settings",
-      outcome: "Active"
-    }
-  ])
+  const [localUserOverrides, setLocalUserOverrides] = useState<Record<number, string>>({})
+  const [adminAuditRows, setAdminAuditRows] = useState<SettingsAuditRow[]>([])
   const {
     scenarios: savedScenarios,
     activeScenarioId,
@@ -135,6 +124,32 @@ export default function SettingsPage() {
     },
     refetchInterval: 30000
   })
+  const usersQuery = useQuery<SettingsUser[]>({
+    queryKey: ["settings-users"],
+    queryFn: async () => {
+      const response = await apiClient.get("/settings/users")
+      return response.data
+    }
+  })
+  const auditQuery = useQuery<SettingsAuditRow[]>({
+    queryKey: ["settings-audit"],
+    queryFn: async () => {
+      const response = await apiClient.get("/settings/audit")
+      return response.data
+    }
+  })
+  const organizationQuery = useQuery({
+    queryKey: ["settings-organization"],
+    queryFn: async () => {
+      const response = await apiClient.get("/settings/organization")
+      return response.data
+    }
+  })
+
+  const users = useMemo(
+    () => (usersQuery.data || []).map((item) => ({ ...item, status: localUserOverrides[item.id] || item.status })),
+    [localUserOverrides, usersQuery.data]
+  )
 
   useEffect(() => {
     hydrate()
@@ -152,24 +167,11 @@ export default function SettingsPage() {
     }))
 
     return [
-      {
-        time: "2026-07-21 10:42:18",
-        actor: "system",
-        action: "AUTH_SESSION_READY",
-        resource: "local-operator-access",
-        outcome: "Active"
-      },
-      {
-        time: "2026-07-21 10:35:02",
-        actor: "system",
-        action: "PRODUCTION_BUILD_VERIFIED",
-        resource: "frontend",
-        outcome: "Passed"
-      },
+      ...(auditQuery.data || []),
       ...scenarioRows,
       ...adminAuditRows
     ]
-  }, [savedScenarios, adminAuditRows, user?.email])
+  }, [savedScenarios, adminAuditRows, auditQuery.data])
 
   const runIngestion = () => {
     setSettingsStatus("")
@@ -192,7 +194,7 @@ export default function SettingsPage() {
     if (!targetUser) return
 
     const nextStatus = targetUser.status === "Active" ? "Inactive" : "Active"
-    setUsers((current) => current.map((user) => user.id === id ? { ...user, status: nextStatus } : user))
+    setLocalUserOverrides((current) => ({ ...current, [id]: nextStatus }))
     setAdminAuditRows((current) => [
       {
         time: new Date().toISOString(),
@@ -581,8 +583,8 @@ export default function SettingsPage() {
           {activeTab === "organization" && (
             <div className="space-y-5">
               <div className="grid gap-4 md:grid-cols-3">
-                <MetricCard label="Tenant" value="Sanchar AI" detail="Single enterprise workspace for logistics operations." icon={Building2} tone="green" />
-                <MetricCard label="Regions" value="India / APAC" detail="Configured around workbook hubs and repair flows." icon={Sparkles} tone="green" />
+                <MetricCard label="Tenant" value={organizationQuery.data?.name ?? "Loading"} detail={organizationQuery.data?.tenant_id ?? "Tenant profile is loaded from the backend."} icon={Building2} tone="green" />
+                <MetricCard label="Regions" value={organizationQuery.data?.region ?? "Loading"} detail={organizationQuery.data?.plan ?? "Configured around workbook hubs and repair flows."} icon={Sparkles} tone="green" />
                 <MetricCard label="Retention" value="365 days" detail="Audit and scenario records retained for review." icon={History} tone="slate" />
               </div>
               <Card className="rounded-[24px] border-white/80 shadow-sm">
