@@ -23,18 +23,18 @@ interface AuthState {
 
 export const seededOperator: UserProfile = {
   id: "seeded-operator",
-  email: "operations.admin@sanchar.ai",
-  fullName: "Operations Admin",
+  email: "admin@sanchar.ai",
+  fullName: "System Admin",
   role: "Admin"
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      user: seededOperator,
-      token: "local-operator-token",
-      isAuthenticated: true,
-      isLoading: false,
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: true,
 
       setLoading: (isLoading) => {
         set({ isLoading })
@@ -51,9 +51,9 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         set({
-          user: seededOperator,
-          token: "local-operator-token",
-          isAuthenticated: true,
+          user: null,
+          token: null,
+          isAuthenticated: false,
           isLoading: false
         })
       }
@@ -66,11 +66,7 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated
       }),
       onRehydrateStorage: () => (state) => {
-        if (!state?.user || !state?.token) {
-          state?.setSession(seededOperator, "local-operator-token")
-          return
-        }
-        state.setLoading(false)
+        state?.setLoading(false)
       }
     }
   )

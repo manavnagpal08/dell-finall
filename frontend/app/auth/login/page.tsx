@@ -6,6 +6,9 @@ import Image from "next/image"
 import { ArrowRight, Lock, Mail, ShieldCheck, Package, Truck, Route, MapPin, BrainCircuit, EyeOff, Map, Check, Clock } from "lucide-react"
 import { seededOperator, useAuthStore } from "@/store/auth"
 
+import { createClient } from "@/utils/supabase/client"
+import { isSupabaseConfigured } from "@/lib/supabase"
+
 export default function LoginPage() {
   const setSession = useAuthStore((state) => state.setSession)
   const [email, setEmail] = useState("")
@@ -13,30 +16,58 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    setSession(seededOperator, "local-operator-token")
-  }, [setSession])
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
-    const loginEmail = email.trim() || seededOperator.email
+    const loginEmail = email.trim()
+    if (!loginEmail || !password) {
+      setError("Please enter your email and password.")
+      return
+    }
+
     setIsLoading(true)
-    setSession(
-      {
-        ...seededOperator,
+    if (isSupabaseConfigured()) {
+      const supabase = createClient()
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: loginEmail,
-        fullName: loginEmail === seededOperator.email ? seededOperator.fullName : loginEmail.split("@")[0]
-      },
-      "local-operator-token"
-    )
-    window.location.assign("/dashboard")
+        password: password,
+      })
+
+      if (signInError) {
+        setError(signInError.message)
+        setIsLoading(true) // Set to true to match loader state during error redirect or keep false
+        setIsLoading(false)
+        return
+      }
+
+      if (data?.user) {
+        setSession(
+          {
+            id: data.user.id,
+            email: data.user.email || "",
+            fullName: data.user.user_metadata?.full_name || loginEmail.split("@")[0],
+            role: (data.user.app_metadata?.role || data.user.user_metadata?.role || "Viewer") as any,
+          },
+          data.session?.access_token || "supabase-token"
+        )
+        window.location.assign("/dashboard")
+      }
+    } else {
+      // Local fallback
+      if (loginEmail === seededOperator.email && password === "12345678") {
+        setSession(seededOperator, "local-operator-token")
+        window.location.assign("/dashboard")
+      } else {
+        setError("Invalid credentials. Try using the default credentials button or configuring Supabase.")
+        setIsLoading(false)
+      }
+    }
   }
 
   const handleSeededLogin = () => {
     setEmail(seededOperator.email)
-    setPassword("Sanchar@12345")
+    setPassword("12345678")
     setError("")
     setSession(seededOperator, "local-operator-token")
     window.location.assign("/dashboard")
@@ -66,12 +97,13 @@ export default function LoginPage() {
           {/* Top Logo */}
           <div className="relative z-10 flex flex-col items-start gap-2">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#06b6d4] to-[#3b82f6] text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]">
-                <span className="text-[26px] font-black italic tracking-tighter">S</span>
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">
-                Sanchar <span className="text-[#10b981]">AI</span>
-              </h1>
+              <Image
+                src="/logo.png"
+                alt="Sanchar AI Logo"
+                width={130}
+                height={36}
+                className="h-9 w-auto object-contain"
+              />
             </div>
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
               SMARTER LOGISTICS. STRONGER TOMORROW.
@@ -205,8 +237,8 @@ export default function LoginPage() {
               className="mb-5 flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100"
             >
               <span>
-                <span className="block text-[12px] font-black text-emerald-800">Continue as Operations Admin</span>
-                <span className="block text-[10px] font-semibold text-emerald-700/70">operations.admin@sanchar.ai / Sanchar@12345</span>
+                <span className="block text-[12px] font-black text-emerald-800">Continue as System Admin</span>
+                <span className="block text-[10px] font-semibold text-emerald-700/70">admin@sanchar.ai / 12345678</span>
               </span>
               <ArrowRight className="h-4 w-4 text-emerald-700" />
             </Link>
